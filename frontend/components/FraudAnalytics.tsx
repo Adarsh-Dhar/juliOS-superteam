@@ -2,68 +2,91 @@
 
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { useState, useEffect } from 'react';
-import { TrendingDown, AlertTriangle, Shield, Zap } from 'lucide-react';
+import { RefreshCw, Shield, Zap } from 'lucide-react';
 
 interface FraudPattern {
-  id: number;
+  id: string;
+  type: string;
+  count: number;
+  confidence: number;
+  severity: 'low' | 'medium' | 'high';
+  connections: string[];
   x: number;
   y: number;
-  severity: 'low' | 'medium' | 'high';
-  connections: number[];
+}
+
+interface TimelinePoint {
+  time: string;
+  authentic: number;
+  suspicious: number;
+  fake: number;
 }
 
 export default function FraudAnalytics() {
   const [trustScore, setTrustScore] = useState(87);
   const [fraudPatterns, setFraudPatterns] = useState<FraudPattern[]>([]);
-  const [timelineData, setTimelineData] = useState([
-    { time: '00:00', authentic: 45, suspicious: 12, fake: 3 },
-    { time: '04:00', authentic: 52, suspicious: 18, fake: 7 },
-    { time: '08:00', authentic: 89, suspicious: 24, fake: 11 },
-    { time: '12:00', authentic: 134, suspicious: 31, fake: 15 },
-    { time: '16:00', authentic: 98, suspicious: 28, fake: 9 },
-    { time: '20:00', authentic: 76, suspicious: 22, fake: 8 },
-  ]);
+  const [timelineData, setTimelineData] = useState<TimelinePoint[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
   const rotateX = useTransform(mouseY, [-300, 300], [10, -10]);
   const rotateY = useTransform(mouseX, [-300, 300], [-10, 10]);
 
+  // Fetch trust score from backend
+  const fetchTrustScore = async () => {
+    try {
+      const response = await fetch('/api/analytics/trust-score');
+      const data = await response.json();
+      setTrustScore(data.score);
+    } catch (error) {
+      console.error('Failed to fetch trust score:', error);
+    }
+  };
+
+  // Fetch fraud patterns from backend
+  const fetchFraudPatterns = async () => {
+    try {
+      const response = await fetch('/api/analytics/fraud-patterns');
+      const data = await response.json();
+      // Map to visualization format with positions
+      const patterns = data.patterns.map((pattern: any, index: number) => ({
+        ...pattern,
+        x: 100 + (index % 5) * 80,
+        y: 100 + Math.floor(index / 5) * 100,
+        connections: pattern.relatedPatterns.slice(0, 3)
+      }));
+      setFraudPatterns(patterns);
+    } catch (error) {
+      console.error('Failed to fetch fraud patterns:', error);
+    }
+  };
+
+  // Fetch timeline data from backend
+  const fetchTimelineData = async () => {
+    try {
+      const response = await fetch('/api/analytics/timeline');
+      const data = await response.json();
+      setTimelineData(data);
+    } catch (error) {
+      console.error('Failed to fetch timeline data:', error);
+    }
+  };
+
+  // Fetch all data
+  const fetchData = async () => {
+    setIsLoading(true);
+    await Promise.all([
+      fetchTrustScore(),
+      fetchFraudPatterns(),
+      fetchTimelineData()
+    ]);
+    setIsLoading(false);
+  };
+
   useEffect(() => {
-    // Initialize fraud constellation
-    const patterns: FraudPattern[] = Array.from({ length: 15 }, (_, i) => ({
-      id: i,
-      x: 100 + Math.random() * 400,
-      y: 100 + Math.random() * 300,
-      severity: ['low', 'medium', 'high'][Math.floor(Math.random() * 3)] as 'low' | 'medium' | 'high',
-      connections: []
-    }));
-
-    // Create connections between suspicious patterns
-    patterns.forEach(pattern => {
-      if (Math.random() > 0.7) {
-        const nearbyPatterns = patterns
-          .filter(p => p.id !== pattern.id)
-          .filter(p => {
-            const distance = Math.sqrt((p.x - pattern.x) ** 2 + (p.y - pattern.y) ** 2);
-            return distance < 150;
-          })
-          .slice(0, 2);
-        
-        pattern.connections = nearbyPatterns.map(p => p.id);
-      }
-    });
-
-    setFraudPatterns(patterns);
-
-    // Animate trust score changes
-    const interval = setInterval(() => {
-      setTrustScore(prev => {
-        const change = (Math.random() - 0.5) * 4;
-        return Math.max(75, Math.min(95, prev + change));
-      });
-    }, 3000);
-
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -81,6 +104,19 @@ export default function FraudAnalytics() {
       default: return '#4C6EF5';
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+        >
+          <RefreshCw className="w-12 h-12 text-blue-500" />
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="py-20 px-4">
@@ -260,7 +296,7 @@ export default function FraudAnalytics() {
                     whileHover={{ scale: 1.5, opacity: 1 }}
                     transition={{ 
                       duration: 0.5,
-                      delay: pattern.id * 0.1
+                      delay: Number(pattern.id) * 0.1
                     }}
                   />
                   {pattern.severity === 'high' && (
@@ -333,9 +369,14 @@ export default function FraudAnalytics() {
 
               {/* Data bars */}
               {timelineData.map((data, index) => {
-                const x = (index / (timelineData.length - 1)) * 100;
-                const maxValue = Math.max(...timelineData.map(d => d.authentic + d.suspicious + d.fake));
-                
+                const x = timelineData.length > 1 ? (index / (timelineData.length - 1)) * 100 : 0;
+                const maxValue = Math.max(1, ...timelineData.map(d => Number(d.authentic) + Number(d.suspicious) + Number(d.fake)));
+                const authenticHeight = Math.round((Number(data.authentic) / maxValue) * 80);
+                const authenticY = 100 - authenticHeight;
+                const suspiciousHeight = Math.round((Number(data.suspicious) / maxValue) * 80);
+                const suspiciousY = 100 - suspiciousHeight;
+                const fakeHeight = Math.round((Number(data.fake) / maxValue) * 80);
+                const fakeY = 100 - fakeHeight;
                 return (
                   <g key={data.time}>
                     {/* Authentic bars */}
@@ -347,8 +388,8 @@ export default function FraudAnalytics() {
                       fill="url(#authenticGradient)"
                       initial={{ height: "0%" }}
                       animate={{ 
-                        height: `${(data.authentic / maxValue) * 80}%`,
-                        y: `${100 - (data.authentic / maxValue) * 80}%`
+                        height: `${authenticHeight}%`,
+                        y: `${authenticY}%`
                       }}
                       transition={{ duration: 1, delay: index * 0.2 }}
                     />
@@ -362,8 +403,8 @@ export default function FraudAnalytics() {
                       fill="url(#suspiciousGradient)"
                       initial={{ height: "0%" }}
                       animate={{ 
-                        height: `${(data.suspicious / maxValue) * 80}%`,
-                        y: `${100 - (data.suspicious / maxValue) * 80}%`
+                        height: `${suspiciousHeight}%`,
+                        y: `${suspiciousY}%`
                       }}
                       transition={{ duration: 1, delay: index * 0.2 + 0.5 }}
                     />
@@ -377,8 +418,8 @@ export default function FraudAnalytics() {
                       fill="url(#fakeGradient)"
                       initial={{ height: "0%" }}
                       animate={{ 
-                        height: `${(data.fake / maxValue) * 80}%`,
-                        y: `${100 - (data.fake / maxValue) * 80}%`
+                        height: `${fakeHeight}%`,
+                        y: `${fakeY}%`
                       }}
                       transition={{ duration: 1, delay: index * 0.2 + 1 }}
                     />

@@ -2,12 +2,31 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 export async function GET() {
-  // List all active agents
+  // List all agents with required fields
   const agents = await prisma.agent.findMany({
-    where: { status: 'ACTIVE' },
+    select: {
+      id: true,
+      type: true,
+      status: true,
+      location: true,
+      processedCount: true,
+      accuracy: true,
+      lastActiveAt: true,
+    },
     orderBy: { createdAt: 'desc' },
   });
-  return NextResponse.json(agents);
+
+  // Map status based on lastActiveAt
+  const now = Date.now();
+  const mappedAgents = agents.map(agent => ({
+    ...agent,
+    status:
+      agent.lastActiveAt && new Date(agent.lastActiveAt).getTime() > now - 5 * 60 * 1000
+        ? 'ACTIVE'
+        : 'OFFLINE',
+  }));
+
+  return NextResponse.json(mappedAgents);
 }
 
 export async function POST(req: NextRequest) {
