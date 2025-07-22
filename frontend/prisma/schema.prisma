@@ -1,0 +1,163 @@
+// schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SocialPlatform {
+  TWITTER
+  INSTAGRAM
+  TIKTOK
+  YOUTUBE
+  FACEBOOK
+  LINKEDIN
+}
+
+enum VerificationStatus {
+  PENDING
+  AUTHENTIC
+  FAKE
+}
+
+enum AgentType {
+  CRAWLER
+  VALIDATOR
+}
+
+model User {
+  id                String        @id @default(uuid())
+  walletAddress     String?       @unique
+  username          String
+  socialProfiles    SocialProfile[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model SocialProfile {
+  id                String        @id @default(uuid())
+  platform          SocialPlatform
+  platformId        String
+  handle            String
+  followerCount     Int
+  user              User          @relation(fields: [userId], references: [id])
+  userId            String
+  posts             Post[]
+  certificates      Certificate[]
+  createdAt         DateTime      @default(now())
+  
+  @@unique([platform, platformId])
+  @@index([handle])
+}
+
+model Campaign {
+  id                String        @id @default(uuid())
+  name              String
+  hashtag           String        @unique
+  description       String?
+  startDate         DateTime
+  endDate           DateTime?
+  posts             Post[]
+  trustScore        Float         @default(0.0)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  AnalyticsSnapshot AnalyticsSnapshot[]
+}
+
+model Post {
+  id                String        @id @default(uuid())
+  content           String
+  mediaUrl          String?
+  platform          SocialPlatform
+  platformPostId    String        @unique
+  likes             Int           @default(0)
+  comments          Int           @default(0)
+  shares            Int           @default(0)
+  engagementScore   Float         @default(0.0)
+  ipfsHash          String
+  socialProfile     SocialProfile @relation(fields: [socialProfileId], references: [id])
+  socialProfileId   String
+  campaign          Campaign?     @relation(fields: [campaignId], references: [id])
+  campaignId        String?
+  verification      Verification? @relation(fields: [verificationId], references: [id])
+  verificationId    String? @unique
+  createdAt         DateTime      @default(now())
+  
+  @@index([platform])
+  @@index([createdAt])
+}
+
+model Verification {
+  id                String        @id @default(uuid())
+  status            VerificationStatus @default(PENDING)
+  confidence        Float         @default(0.0)
+  post              Post?
+  votes             Vote[]
+  certificate       Certificate?
+  fraudType         String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model Vote {
+  id                String        @id @default(uuid())
+  decision          VerificationStatus
+  confidence        Float
+  verification      Verification  @relation(fields: [verificationId], references: [id])
+  verificationId    String
+  agent             Agent         @relation(fields: [agentId], references: [id])
+  agentId           String
+  createdAt         DateTime      @default(now())
+  
+  @@unique([verificationId, agentId])
+}
+
+model Agent {
+  id                String        @id @default(uuid())
+  type              AgentType
+  name              String
+  status            String        @default("ACTIVE") // ACTIVE, IDLE, OFFLINE
+  uptime            Int           @default(0) // in seconds
+  accuracy          Float         @default(0.0)
+  processedCount    Int           @default(0)
+  lastActiveAt      DateTime?
+  votes             Vote[]
+  location          String?       // e.g., "us-east-1"
+  version           String?
+  createdAt         DateTime      @default(now())
+}
+
+model Certificate {
+  id                String        @id @default(uuid())
+  tokenId           String        @unique
+  contractAddress   String
+  txHash            String
+  trustScore        Float
+  socialProfile     SocialProfile @relation(fields: [socialProfileId], references: [id])
+  socialProfileId   String
+  verification      Verification  @relation(fields: [verificationId], references: [id])
+  verificationId    String @unique
+  metadataUri       String
+  createdAt         DateTime      @default(now())
+  
+  @@index([txHash])
+  @@index([contractAddress])
+}
+
+model AnalyticsSnapshot {
+  id                String        @id @default(uuid())
+  timestamp         DateTime      @default(now())
+  totalPosts        Int
+  authenticCount    Int
+  fakeCount         Int
+  avgTrustScore     Float
+  fraudDistribution Json?         // JSON structure: {botComments: number, fakeLikes: number, ...}
+  topFraudTypes     String[]
+  agentActivity     Json?         // {crawlersActive: number, validatorsActive: number}
+  campaign          Campaign      @relation(fields: [campaignId], references: [id])
+  campaignId        String
+}
