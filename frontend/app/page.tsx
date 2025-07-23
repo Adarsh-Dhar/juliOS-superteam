@@ -7,6 +7,7 @@ import VerificationHub from '@/components/VerificationHub';
 import SwarmVisualization from '@/components/SwarmVisualization';
 import FraudAnalytics from '@/components/FraudAnalytics';
 import CertificationGallery from '@/components/CertificationGallery';
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
 export default function TrustGuardDashboard() {
   const [currentSection, setCurrentSection] = useState(0);
@@ -56,13 +57,19 @@ export default function TrustGuardDashboard() {
             ))}
           </div>
 
-          <motion.div
+          {/* <motion.div
             className="flex items-center space-x-2 text-sm font-exo2"
             whileHover={{ scale: 1.05 }}
           >
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-            <span className="text-gray-400">Network Online</span>
-          </motion.div>
+            <motion.button
+              className="liquid-fill bg-gradient-to-r from-purple-500 to-blue-500 px-5 py-2 rounded-full font-exo2 font-semibold text-white shadow-md border border-purple-500/40 hover:from-blue-500 hover:to-purple-500 transition-colors duration-300"
+              whileHover={{ scale: 1.08, boxShadow: '0 0 20px rgba(76,110,245,0.3)' }}
+              whileTap={{ scale: 0.97 }}
+            >
+              Connect Wallet
+            </motion.button>
+          </motion.div> */}
+          <WalletMultiButton />
         </div>
       </motion.nav>
 
