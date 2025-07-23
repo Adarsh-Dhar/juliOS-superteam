@@ -26,6 +26,8 @@ enum VerificationStatus {
 enum AgentType {
   CRAWLER
   VALIDATOR
+  ANALYTICS
+  REPORTER
 }
 
 model User {
@@ -129,6 +131,64 @@ model Agent {
   location          String?       // e.g., "us-east-1"
   version           String?
   createdAt         DateTime      @default(now())
+  // Relations to new models
+  contentItems      ContentItem[]
+  analysisResults   AnalysisResult[]
+  validationVotes   ValidationVote[]
+}
+
+model ContentItem {
+  id           String   @id @default(uuid())
+  cid          String   @unique
+  content      String
+  source       String
+  timestamp    DateTime @default(now())
+  metadata     Json
+  createdById  String?
+  createdBy    Agent?   @relation(fields: [createdById], references: [id])
+  analysis     AnalysisResult[]
+}
+
+model AnalysisResult {
+  id               String   @id @default(uuid())
+  cid              String
+  sentiment        Float
+  engagementScore  Float
+  redFlags         String[]
+  llmModel         String
+  timestamp        DateTime @default(now())
+  contentItemId    String
+  contentItem      ContentItem @relation(fields: [contentItemId], references: [id])
+  createdById      String?
+  createdBy        Agent?   @relation(fields: [createdById], references: [id])
+}
+
+model ValidationVote {
+  id            String   @id @default(uuid())
+  validatorId   String
+  cid           String
+  decision      String
+  confidence    Float
+  reputation    Float
+  createdAt     DateTime @default(now())
+  agentId       String?
+  agent         Agent?   @relation(fields: [agentId], references: [id])
+}
+
+model OnchainProof {
+  id              String   @id @default(uuid())
+  contentHash     String
+  consensusScore  Float
+  txHash          String
+  blockNumber     Int
+  timestamp       DateTime @default(now())
+}
+
+model Event {
+  id         String   @id @default(uuid())
+  type       String
+  payload    Json
+  timestamp  DateTime @default(now())
 }
 
 model Certificate {
