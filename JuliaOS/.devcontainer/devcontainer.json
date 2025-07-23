@@ -1,0 +1,24 @@
+{
+  "name": "J3OS Interactive Environment",
+  "dockerFile": "../Dockerfile.interactive",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "julialang.language-julia",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ],
+      "settings": {
+        "terminal.integrated.shell.linux": "/bin/bash"
+      }
+    }
+  },
+  "forwardPorts": [3000],
+  "postCreateCommand": "mkdir -p agents swarms routes && npm install --no-save chalk@4.1.2 inquirer@8.2.4 commander fs-extra",
+  "postStartCommand": "node scripts/interactive.js",
+  "mounts": [
+    "source=${localWorkspaceFolder}/agents,target=/app/agents,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/swarms,target=/app/swarms,type=bind,consistency=cached",
+    "source=${localWorkspaceFolder}/routes,target=/app/routes,type=bind,consistency=cached"
+  ]
+} 

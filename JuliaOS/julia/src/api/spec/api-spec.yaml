@@ -1,0 +1,169 @@
+openapi: 3.1.0
+info:
+  title: JuliaOS API
+  description: API for JuliaOS backend server
+  version: 0.1.0
+
+servers:
+  - url: /api/v1
+  
+paths:
+  /agents:
+    get:
+      operationId: listAgents
+      summary: Get all agents
+      description: Retrieve a list of all agents
+      responses:
+        '200':
+          description: A list of agents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Agent'
+    post:
+      operationId: createAgent
+      summary: Create a new agent
+      description: Create a new agent with the provided details
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Agent'
+      responses:
+        '201':
+          description: Agent created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+  
+  /agents/{agent_id}:
+    put:
+      operationId: updateAgent
+      summary: Update a specific agent
+      description: Update the details of a specific agent by ID
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          description: The ID of the agent to update
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentUpdate'
+      responses:
+        '200':
+          description: Agent updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+        '404':
+          description: Agent not found
+    delete:
+      operationId: deleteAgent
+      summary: Delete a specific agent
+      description: Delete a specific agent by ID
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          description: The ID of the agent to delete
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Agent deleted successfully
+        '404':
+          description: Agent not found
+
+  /agents/{agent_id}/webhook:
+    post:
+      operationId: processAgentWebhook
+      summary: Trigger event-based agents and provide data to them
+      description: Process a webhook event for a specific agent by ID
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          description: The ID of the agent to trigger
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: A payload to be passed to the agent
+      responses:
+        '200':
+          description: Webhook processed successfully
+        '400':
+          description: Bad request, invalid payload
+        '404':
+          description: Agent not found
+
+  /agents/{agent_id}/output:
+    get:
+      operationId: getAgentOutput
+      summary: Get the output of a specific agent
+      description: Retrieve the output of a specific agent by ID
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          description: The ID of the agent to retrieve output for
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent output retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: Agent not found
+
+components:
+  schemas:
+    Agent:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "agent123"
+        name:
+          type: string
+          example: "TradingAgent"
+          description: A human-readable name for the agent that describes its role
+        state:
+          type: string
+          enum: ["CREATED", "RUNNING", "PAUSED", "STOPPED"]
+          example: "RUNNING"
+          description: The current state of the agent
+      required:
+        - id
+        - name
+        - state  
+      
+
+    AgentUpdate:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: ["RUNNING", "PAUSED", "STOPPED"]
+          example: "PAUSED"
+      required:
+        - state

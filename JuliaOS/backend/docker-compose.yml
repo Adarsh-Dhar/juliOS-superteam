@@ -1,0 +1,44 @@
+services:
+    
+  julia-db:
+    image: postgres:17
+    container_name: julia-db
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_LOGGING: "true"
+      PGPORT: ${DB_PORT}
+    volumes:
+      - ./migrations/up.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -p ${DB_PORT}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+    expose:
+      - "${DB_PORT}"
+    ports:
+      - "${DB_PORT}:${DB_PORT}"
+    command: -p ${DB_PORT}
+
+  julia_backend:
+    build: .
+    container_name: julia_backend
+    env_file:
+      - .env
+    environment:
+      JULIA_PROJECT: "@."
+      HOST: "0.0.0.0"
+      PORT: "8052"
+      DB_HOST: "julia-db"
+    ports:
+      - "8052:8052"
+    restart: unless-stopped
+    depends_on:
+      - julia-db

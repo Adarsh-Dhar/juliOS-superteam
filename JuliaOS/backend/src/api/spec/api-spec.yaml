@@ -1,0 +1,363 @@
+openapi: 3.1.0
+info:
+  title: JuliaOS API
+  description: API for JuliaOS backend server
+  version: 0.1.0
+
+servers:
+  - url: /api/v1
+  
+paths:
+  /agents:
+    get:
+      operationId: listAgents
+      summary: Get all agents
+      description: Retrieve a list of all agents
+      responses:
+        '200':
+          description: A list of agents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AgentSummary'
+    post:
+      operationId: createAgent
+      summary: Create a new agent
+      description: Create a new agent with the provided details
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  description: Unique identifier for the agent
+                name:
+                  type: string
+                  description: Human-readable name of the agent
+                  example: "Email Triage Bot"
+                description:
+                  type: string
+                  description: Short summary of what the agent does
+                  example: "Automatically processes and routes incoming support emails."
+                blueprint:
+                  $ref: '#/components/schemas/AgentBlueprint'
+              required:
+                - id
+                - name
+                - description
+                - blueprint
+      responses:
+        '201':
+          description: Agent created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSummary'
+  
+  /agents/{agent_id}:
+    get:
+      operationId: getAgent
+      summary: Get a specific agent
+      description: Retrieve the details of a specific agent by ID
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          description: The ID of the agent to retrieve
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSummary'
+        '404':
+          description: Agent not found
+    put:
+      operationId: updateAgent
+      summary: Update a specific agent
+      description: Update the details of a specific agent by ID
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          description: The ID of the agent to update
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentUpdate'
+      responses:
+        '200':
+          description: Agent updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSummary'
+        '404':
+          description: Agent not found
+    delete:
+      operationId: deleteAgent
+      summary: Delete a specific agent
+      description: Delete a specific agent by ID
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          description: The ID of the agent to delete
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Agent deleted successfully
+        '404':
+          description: Agent not found
+
+  /agents/{agent_id}/webhook:
+    post:
+      operationId: processAgentWebhook
+      summary: Trigger event-based agents and provide data to them
+      description: Process a webhook event for a specific agent by ID
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          description: The ID of the agent to trigger
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              description: A payload to be passed to the agent
+      responses:
+        '200':
+          description: Webhook processed successfully
+        '400':
+          description: Bad request, invalid payload
+        '404':
+          description: Agent not found
+
+  /agents/{agent_id}/logs:
+    get:
+      operationId: getAgentLogs
+      summary: Get the logs of a specific agent
+      description: Retrieve the logs of a specific agent by ID
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          description: The ID of the agent to retrieve logs for
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: Agent not found
+
+  /agents/{agent_id}/output:
+    get:
+      operationId: getAgentOutput
+      summary: Get the output of a specific agent
+      description: Retrieve the output of a specific agent by ID
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          description: The ID of the agent to retrieve output for
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent output retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          description: Agent not found
+
+  /tools:
+    get:
+      operationId: listTools
+      summary: Get a list of all tools available for use by agents in the system
+      responses:
+        '200':
+          description: A list of tools
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ToolSummary'
+
+  /strategies:
+    get:
+      operationId: listStrategies
+      summary: Get a list of all strategies available for use by agents in the system
+      responses:
+        '200':
+          description: A list of strategies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StrategySummary'
+
+components:
+  schemas:
+    AgentSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "agent123"
+        name:
+          type: string
+          example: "My First Agent"
+          description: Human-readable name of the agent
+        description:
+          type: string
+          description: Brief summary of what the agent does
+          example: "Automatically triages incoming customer-support emails and escalates when necessary."
+        state:
+          type: string
+          enum: ["CREATED", "RUNNING", "PAUSED", "STOPPED"]
+          example: "RUNNING"
+          description: The current state of the agent
+        trigger_type:
+          type: string
+          enum: ["PERIODIC", "WEBHOOK"]
+          example: "PERIODIC"
+          description: Specifies how the agent is activated
+        input_schema:
+          type: object
+          description: >
+            JSON-Schema describing the structure the agent expects as
+            input when its `run` endpoint is invoked. Omitted when the agent
+            declares no input type.
+          example:
+            type: object
+            properties:
+              value:
+                type: integer
+            required: ["value"]
+      required:
+        - id
+        - name
+        - description
+        - state
+        - trigger_type
+
+    AgentBlueprint:
+      type: object
+      properties:
+        tools:
+          type: array
+          items:
+            $ref: '#/components/schemas/ToolBlueprint'
+          description: List of tools the agent can use
+        strategy:
+          $ref: '#/components/schemas/StrategyBlueprint'
+          description: The strategy to guide the agent
+        trigger:
+          $ref: '#/components/schemas/TriggerConfig'
+          description: Configuration for event-based triggering of the agent
+      required:
+        - tools
+        - strategy
+        - trigger
+
+    AgentUpdate:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: ["RUNNING", "PAUSED", "STOPPED"]
+          example: "PAUSED"
+      required:
+        - state
+
+    ToolBlueprint:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the tool as registered in the system
+        config:
+          type: object
+          additionalProperties: true
+      required:
+        - name
+        - config
+
+    StrategyBlueprint:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the strategy as registered in the system
+        config:
+          type: object
+          additionalProperties: true
+      required:
+        - name
+        - config
+    
+    TriggerConfig:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: ["webhook", "periodic"]
+        params:
+          type: object
+          additionalProperties: true
+      required:
+        - type
+        - params
+
+    ToolSummary:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the tool
+        metadata:
+          type: object
+          properties:
+            description:
+              type: string
+              description: Description of the tool
+      required:
+        - name
+
+    StrategySummary:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the strategy
+      required:
+        - name

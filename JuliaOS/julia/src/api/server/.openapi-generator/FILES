@@ -1,0 +1,9 @@
+README.md
+docs/Agent.md
+docs/AgentUpdate.md
+docs/DefaultApi.md
+src/JuliaOSServer.jl
+src/apis/api_DefaultApi.jl
+src/modelincludes.jl
+src/models/model_Agent.jl
+src/models/model_AgentUpdate.jl

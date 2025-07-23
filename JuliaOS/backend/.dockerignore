@@ -1,0 +1,23 @@
+# Ignore Julia build artifacts
+.julia/
+.julia_history
+
+# Ignore compiled artifacts
+*.ji
+*.o
+*.so
+*.dylib
+
+# Ignore local Julia environments not needed inside container
+__pycache__/
+*.pyc
+Manifest.toml
+Manifest.toml.bak
+
+# Ignore Git and editor junk
+.git/
+.gitignore
+*.swp
+*.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,6 @@
+httpx>=0.20
+langchain-core>=0.1.0
+
+[dev]
+pytest
+ruff

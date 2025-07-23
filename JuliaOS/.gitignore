@@ -1,0 +1,459 @@
+# Build and Output
+dist/
+build/
+target/
+artifacts/
+cache/
+typechain-types/
+.turbo/
+node_modules/
+
+julia/Manifest.toml
+
+# Generated runtime directories
+cli/data/agent-memories/
+cli/data/logs/
+cli/@juliaos/
+packages/@juliaos/
+data/secrets/
+
+# Temporary files
+temp/
+temp-transfer/
+transfer-temp/
+tmp/
+.tmp/
+*-minimal.zip
+*-slim.zip
+transfer-instructions.txt
+exclusions.txt
+.cursor/rules
+
+# Utils
+openapi-generator-cli.jar
+
+# Agent and wallet data - Don't commit sensitive information
+data/agent-memories/
+data/wallets/
+data/secrets/
+data/wallet.json
+data/*.json
+cli/data/agent-memories/
+cli/data/wallets/
+cli/data/secrets/
+cli/data/*.json
+cli/data/marketplace/
+cli/data/purchases/
+cli/data/storage/
+**/*/data/wallets/
+**/*/data/secrets/
+**/*/data/*.json
+**/data/marketplace/
+
+
+# Test and Development
+test-ledger/
+test-cli-project/
+test-project/
+tests.old
+coverage/
+.nyc_output/
+test-results/
+qr-test/
+
+# Test Files
+test-*.js
+*-test.js
+test.js
+*.test.js
+demonstrate-*.js
+
+# Environment and Secrets
+.env
+.env.local
+.env.*.local
+.env.test
+.env.development
+.env.production
+secrets.json
+credentials.json
+*-wallet.json
+wallet.json
+solana-wallet.json
+*-keypair.json
+*.pem
+*.key
+*.cert
+**/config/*.env
+**/config/*.json
+!**/config/default_config.json
+!**/config/test_config.json
+
+# Specific environment files in subdirectories
+bridges/relay/.env
+packages/cross-chain-router/.env
+relay/.env
+cli/.env
+packages/*/.env
+**/cli/.env
+
+# API Keys and Tokens
+**/*/apikey*
+**/*/token*
+**/*_token*
+**/*_key*
+**/*_secret*
+**/*_passphrase*
+**/*_mnemonic*
+**/*_seed*
+**/api_key*
+**/secret_key*
+**/*_api_key*
+
+# Discord and Telegram Bot Tokens
+DISCORD_TOKEN*
+TELEGRAM_TOKEN*
+*_BOT_TOKEN*
+
+# Temporary transfer/backup files
+transfer-temp/
+JuliaOSFramework*.zip
+*-minimal.zip
+transfer-instructions.txt
+
+# CLI Commands and Temporary Files
+command.txt
+
+# IDE and Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+.history/
+.vscode-test/
+cursorrules/
+*.code-workspace
+
+# Cursor specific
+.cursor/
+.cursor-server/
+.cursor-server-*
+.cursor-*
+.cursor.json
+.cursor-config/
+.cursor-project/
+.cursor-history/
+.cursor-chat/
+.cursor-commands/
+.cursor-snippets/
+.cursor-settings.json
+
+# OS Generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+.directory
+$RECYCLE.BIN/
+
+# Julia Specific
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+/julia/deps/deps.jl
+# /julia/Manifest.toml # Keep Julia's main Manifest tracked
+# Don't ignore Project.toml files
+# **/Manifest.toml # Removing this line to track Manifests
+/julia/artifacts/
+/julia/compiled/
+/julia/logs/
+**/.julia/
+**/julia-history.jl
+
+# Package Manager
+# Uncomment if you want to ignore lockfiles
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# Python specific
+__pycache__/
+venv/
+python/venv/
+python/src/juliaos.egg-info
+
+# Non-source code files generated for Python from OpenAPI spec
+temp-generated/
+
+# Generated Files
+*.tsbuildinfo
+*.js.map
+*.d.ts
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.debug/
+debug/
+debug.log
+
+# DeFi Specific
+config/production.json
+config/*.key
+config/*.secret
+config/*.pem
+config/*.env
+config/*.json
+!config/test_config.json
+!config/default_config.json
+
+# Solana Specific
+.anchor/
+**/target/
+**/test-ledger/
+**/test-ledger-*/
+**/test-ledger.*/
+
+# Blockchain Specific
+.ethereum/
+.solana/
+.chain/
+*.chain
+*.wallet
+*.keystore
+*.keypair
+*.mnemonic
+*.seed
+*.private
+*.public
+**/geth/
+**/.ethereum/
+**/chaindata/
+**/datadir/
+**/.solana/
+**/.near/
+**/.sui/
+**/.aptos/
+**/network_id_data/
+**/ethereum/
+**/mainnet/
+**/testnet/
+**/devnet/
+**/keystore/
+**/accounts.json
+
+# Market Data
+data/market/
+data/price/
+data/volume/
+data/historical/
+data/indicators/
+data/analysis/
+
+# Monitoring
+monitoring/
+metrics/
+**/performance-logs/
+**/metrics/
+**/benchmarks/results/
+
+# Backup and Recovery
+backup/
+recovery/
+*.bak
+*.backup
+*.recovery
+*.restore
+**/*backup*/
+**/backups/
+**/*.bak
+**/*.backup
+**/*.old
+solana-wallet*.json
+privatekey-*.txt
+mnemonic-*.txt
+
+# Test Data
+test/data/
+test/backup/
+test/logs/
+!test/test_config.json
+**/test-data/
+**/sample-data/
+**/dummy-data/
+**/mock-data/
+
+# Documentation
+docs/_build/
+docs/_static/
+docs/_templates/
+docs/_themes/
+
+# Ignore all other .md files, except root README.md, Python wrapper README.md, a2a README.md and translation files
+**/*.md
+!/README.md
+!/packages/python-wrapper/README.md
+!/packages/python-wrapper/docs/api_reference.md
+!/docs/translations/*.md
+!/a2a/README.md
+
+# Ignore specific root-level .md files
+/CONTRIBUTING.md
+/GITHUB_PREPARATION.md
+/LANGCHAIN_INTEGRATION_PLAN.md
+/MAINTENANCE.md
+/SECURITY.md
+/SWARM_ALGORITHMS_IMPLEMENTATION.md
+
+# Ignore context file
+juliaos-context.mdc
+
+# Local Development
+local/
+dev/
+development/
+*.local
+*.dev
+*.development
+.juliaos-*
+
+# Security (consolidated)
+*.p12
+*.pfx
+*.key
+*.crt
+*.csr
+*.srl
+*.pem
+*.der
+*.priv
+*.pub
+*.sig
+*.sign
+*.token
+*.auth
+*.authz
+*.cert
+*.certificate
+*.chain
+*.chain.cert
+*.chain.key
+*.chain.pem
+*.chain.der
+*.chain.p12
+*.chain.pfx
+*.chain.csr
+*.chain.srl
+*.chain.token
+*.chain.auth
+*.chain.authz
+*.chain.certificate
+*.chain.chain
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.der
+**/*.crt
+**/*.cer
+**/*.priv
+**/*.keystore
+**/private_key*
+**/private-key*
+**/privatekey*
+**/keys.json
+**/wallet-keys.json
+**/wallet_keys.json
+**/*wallet*backup*
+**/*wallet*export*
+**/*wallet*dump*
+
+# AI and LLM related
+ai-history/
+prompt-history/
+*.prompt
+*.conversation
+*.chat-history
+llm-cache/
+
+# Redundant Files
+run-test.bat
+run-test.ps1
+run-direct.bat
+run-direct.ps1
+test-route-creation.js
+demonstrate-cross-chain-router.js
+CLI_SUMMARY.md
+CLI_README.md
+DOCKER_CLEANUP.md
+DOCKER_UNIFIED.md
+Dockerfile.simple
+juliaos.bat
+j3os-cli.sh
+j3os-cli.bat
+j3os.bat
+j3os.sh
+j3os.ps1
+cli/enhanced-cli.js
+cli/consolidated-cli.js
+cli/update-script.js
+cli/run-native.bat
+cli/run-native.sh
+cli/j3os.sh
+cli/j3os.ps1
+run-enhanced-cli.bat
+run-enhanced-cli.sh
+run-enhanced-cli.ps1
+
+# Redundant script files that might be recreated
+/run-cli.sh
+/run-cli.bat
+/run-cli.ps1
+/run-enhanced-cli.sh
+/run-enhanced-cli.bat
+/run-enhanced-cli.ps1
+/docker-run.sh
+/docker-run.bat
+/docker-run.ps1
+/run-enhanced-docker.sh
+/run-enhanced-docker.bat
+/run-enhanced-docker.ps1
+/Dockerfile.enhanced
+/Dockerfile.unified
+/cli-files/
+
+# Old files
+/old-files/
+*/old-files/
+**/old-files/
+cli/old-files/
+
+# Project specific private data
+*.private.json
+.secrets/
+config/*.secret.json
+*.secret.js
+
+# Project documentation with sensitive information
+PROJECT_CONTEXT.md
+GITHUB_PREPARATION.md
+
+# Additional configuration directories
+.j3os_config/
+
+# Any remaining environment files that might be missed
+**/*.env
+**/settings.json

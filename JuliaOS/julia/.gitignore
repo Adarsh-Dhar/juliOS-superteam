@@ -1,0 +1,27 @@
+# Julia 特定文件
+*.jl.*.cov
+*.jl.cov
+*.jl.mem
+/Manifest.toml
+
+# 环境文件
+.env
+.env.*
+!.env.example
+
+# IDE 文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.temp 

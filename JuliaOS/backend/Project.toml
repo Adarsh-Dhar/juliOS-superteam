@@ -1,0 +1,45 @@
+name = "JuliaOSBackend"
+uuid = "12345678-1234-5678-1234-567812345678"
+authors = ["JuliaOS Contributors <contributors@juliaos.org>"]
+version = "0.1.0"
+
+[deps]
+Cascadia = "54eefc05-d75b-58de-a785-1a3403f0919f"
+Conda = "8f4d0f93-b110-5947-807f-2305c1781a2d"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+DotEnv = "4dc1fcf4-5e3b-5448-94ab-0c38ec0385c1"
+Gumbo = "708ec375-b3d6-5a57-a7ce-8257bf98657a"
+HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+JSONSchemaGenerator = "b10a6b5e-eaef-4b72-b159-8e5005e98e8e"
+LibPQ = "194296ae-ab2e-5f79-8cd4-7183a0a5a0d1"
+OpenAPI = "d5e62ea6-ddf3-4d43-8e4c-ad5e6c8bfd7d"
+PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+StructTypes = "856f2bd8-1eba-4b0a-8007-ebc267875bd4"
+SQLStrings = "af517c2e-c243-48fa-aab8-efac3db270f5"
+TimeZones = "f269a46b-ccf7-5d73-abea-4c690281aa53"
+URIs = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
+
+[sources]
+HTTP = {url = "https://github.com/JuliaWeb/HTTP.jl"}
+
+[compat]
+Cascadia = "1.0.2"
+Conda = "1.10.2"
+Dates = "1"
+DotEnv = "1.0.0"
+Gumbo = "0.8.3"
+HTTP = "1.9.14"
+JSON = "0.21.4"
+JSON3 = "1.14.3"
+LibPQ = "1.18.0"
+JSONSchemaGenerator = "0.3.0"
+OpenAPI = "0.2.0"
+PyCall = "1.96.4"
+Random = "1.11.0"
+StructTypes = "1.11.0"
+SQLStrings = "0.1.0"
+TimeZones = "1.21.3"
+URIs = "1.5.2"

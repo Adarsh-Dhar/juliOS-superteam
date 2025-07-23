@@ -1,0 +1,20 @@
+Metadata-Version: 2.4
+Name: juliaos_wrapper
+Version: 0.1.0
+Summary: Python wrapper for interacting with the JuliaOS backend.
+Author-email: JuliaOS Contributors <contributors@example.juliaos.org>
+Project-URL: Homepage, https://github.com/Juliaoscode/JuliaOS
+Project-URL: Bug Tracker, https://github.com/Juliaoscode/JuliaOS/issues
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: httpx>=0.20
+Requires-Dist: langchain-core>=0.1.0
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: ruff; extra == "dev"

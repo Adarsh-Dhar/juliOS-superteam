@@ -1,0 +1,5 @@
+DROP TABLE IF EXISTS agent_tools;
+DROP TABLE IF EXISTS agents;
+
+DROP TYPE IF EXISTS agent_state;
+DROP TYPE IF EXISTS trigger_type;
