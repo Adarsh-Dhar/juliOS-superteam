@@ -37,24 +37,17 @@ export async function POST(req: NextRequest) {
   if (!body.name || !body.type) {
     return NextResponse.json({ error: 'Missing name or type' }, { status: 400 });
   }
-  const agent = await prisma.agent.create({
-    data: {
-      name: body.name,
-      type: body.type,
-      status: 'ACTIVE',
-      processedCount: 0,
-      accuracy: 100,
-      lastActiveAt: new Date(),
-    },
-    select: {
-      id: true,
-      name: true,
-      type: true,
-      status: true,
-      processedCount: true,
-      accuracy: true,
-      lastActiveAt: true,
-    },
-  });
-  return NextResponse.json(agent, { status: 201 });
+
+  // Proxy the request to the Julia backend
+  try {
+    const juliaRes = await fetch('http://localhost:8052/api/v1/agents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const juliaData = await juliaRes.json();
+    return NextResponse.json(juliaData, { status: juliaRes.status });
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to create agent in Julia backend', details: error?.toString() }, { status: 500 });
+  }
 } 
