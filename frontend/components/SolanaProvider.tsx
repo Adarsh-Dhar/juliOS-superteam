@@ -23,4 +23,4 @@ export const SolanaProvider: FC<SolanaProviderProps> = ({ children }) => {
       </WalletProvider>
     </ConnectionProvider>
   );
-};
+}; 

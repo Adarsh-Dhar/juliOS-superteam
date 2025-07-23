@@ -1,7 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Inter, Orbitron, Exo_2 } from 'next/font/google';
-import { SolanaProvider } from './provider';
+import { SolanaProvider } from '../components/SolanaProvider';
 
 const inter = Inter({ subsets: ['latin'] });
 const orbitron = Orbitron({ 
