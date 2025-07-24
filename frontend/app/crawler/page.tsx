@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 const AGENT_TYPE = "CRAWLER";
+const AGENT_STATES = ["RUNNING", "PAUSED", "STOPPED"];
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(" ");
@@ -15,6 +16,8 @@ export default function CrawlerDashboard() {
   const [error, setError] = useState("");
   const [globalLoading, setGlobalLoading] = useState(false);
   const { toast } = useToast();
+  const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
+  const [editingState, setEditingState] = useState<string>("");
 
   async function fetchAgents() {
     setLoading(true);
@@ -22,7 +25,8 @@ export default function CrawlerDashboard() {
     try {
       const res = await fetch("/api/agents");
       const data = await res.json();
-      setAgents(data.filter((a: any) => a.type === AGENT_TYPE));
+      // If type is present, filter by CRAWLER, else show all
+      setAgents(Array.isArray(data) ? data.filter((a: any) => a.type ? a.type === AGENT_TYPE : true) : []);
     } catch (e) {
       setError("Failed to fetch agents");
       toast({ title: "Error", description: "Failed to fetch agents" });
@@ -70,22 +74,24 @@ export default function CrawlerDashboard() {
     setLoading(false);
   }
 
-  async function updateAgentStatus(id: string, status: string) {
+  async function updateAgentStatus(id: string, state: string) {
     setLoading(true);
     setError("");
     try {
       await fetch(`/api/agents/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ state }),
       });
       fetchAgents();
-      toast({ title: "Status Updated", description: `Agent status set to ${status}` });
+      toast({ title: "Status Updated", description: `Agent status set to ${state}` });
     } catch (e) {
       setError("Failed to update agent");
       toast({ title: "Error", description: "Failed to update agent" });
     }
     setLoading(false);
+    setEditingAgentId(null);
+    setEditingState("");
   }
 
   async function sendGlobalAction(action: string) {
@@ -177,33 +183,71 @@ export default function CrawlerDashboard() {
                   <td className="py-2 px-4">
                     <span className={classNames(
                       "inline-block px-2 py-1 rounded text-xs font-semibold",
-                      agent.status === "ACTIVE"
+                      (agent.state === "RUNNING" || agent.status === "ACTIVE")
                         ? "bg-green-900 text-green-400"
-                        : agent.status === "OFFLINE"
+                        : (agent.state === "STOPPED" || agent.status === "OFFLINE")
                         ? "bg-gray-800 text-gray-400"
                         : "bg-yellow-900 text-yellow-400"
                     )}>
-                      {agent.status}
+                      {agent.state || agent.status}
                     </span>
                   </td>
-                  <td className="py-2 px-4 text-gray-200">{agent.processedCount}</td>
-                  <td className="py-2 px-4 text-gray-200">{agent.accuracy?.toFixed(2)}</td>
+                  <td className="py-2 px-4 text-gray-200">{agent.processedCount ?? '-'}</td>
+                  <td className="py-2 px-4 text-gray-200">{agent.accuracy !== undefined ? agent.accuracy.toFixed(2) : '-'}</td>
                   <td className="py-2 px-4 text-gray-400">{agent.lastActiveAt ? new Date(agent.lastActiveAt).toLocaleString() : "-"}</td>
-                  <td className="py-2 px-4 flex gap-2">
-                    <button
-                      className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-xs"
-                      onClick={() => updateAgentStatus(agent.id, agent.status === "ACTIVE" ? "OFFLINE" : "ACTIVE")}
-                      disabled={loading}
-                    >
-                      {agent.status === "ACTIVE" ? "Stop" : "Start"}
-                    </button>
-                    <button
-                      className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-xs"
-                      onClick={() => removeAgent(agent.id)}
-                      disabled={loading}
-                    >
-                      Remove
-                    </button>
+                  <td className="py-2 px-4 flex gap-2 items-center">
+                    {editingAgentId === agent.id ? (
+                      <>
+                        <select
+                          className="bg-gray-800 text-white px-2 py-1 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                          value={editingState}
+                          onChange={e => setEditingState(e.target.value)}
+                        >
+                          <option value="" disabled>Select state</option>
+                          {AGENT_STATES.map(state => (
+                            <option key={state} value={state}>{state}</option>
+                          ))}
+                        </select>
+                        <button
+                          className="bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 text-xs ml-2"
+                          onClick={() => updateAgentStatus(agent.id, editingState)}
+                          disabled={loading || !editingState}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600 text-xs ml-1"
+                          onClick={() => { setEditingAgentId(null); setEditingState(""); }}
+                          disabled={loading}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-xs"
+                          onClick={() => { setEditingAgentId(agent.id); setEditingState(agent.state || ""); }}
+                          disabled={loading}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-xs"
+                          onClick={() => updateAgentStatus(agent.id, agent.status === "ACTIVE" ? "STOPPED" : "RUNNING")}
+                          disabled={loading}
+                        >
+                          {agent.status === "ACTIVE" ? "Stop" : "Start"}
+                        </button>
+                        <button
+                          className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-xs"
+                          onClick={() => removeAgent(agent.id)}
+                          disabled={loading}
+                        >
+                          Remove
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))

@@ -3,10 +3,12 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = "force-dynamic";
 
+const JULIA_API_BASE = 'http://localhost:8052/api/v1/agents';
+
 export async function GET() {
   // Fetch agents from Julia backend
   try {
-    const juliaRes = await fetch('http://localhost:8052/api/v1/agents');
+    const juliaRes = await fetch(JULIA_API_BASE);
     const juliaData = await juliaRes.json();
     return NextResponse.json(juliaData, { status: juliaRes.status });
   } catch (error) {
@@ -22,7 +24,7 @@ export async function POST(req: NextRequest) {
   }
   // Proxy the request to the Julia backend
   try {
-    const juliaRes = await fetch('http://localhost:8052/api/v1/agents', {
+    const juliaRes = await fetch(JULIA_API_BASE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
