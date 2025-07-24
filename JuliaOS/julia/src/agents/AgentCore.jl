@@ -23,7 +23,8 @@ abstract type Schedule end
 # ----------------------------------------------------------------------
 @enum AgentType begin
     TRADING = 1; MONITOR = 2; ARBITRAGE = 3; DATA_COLLECTION = 4;
-    NOTIFICATION = 5; CUSTOM = 99; DEV = 100; CRAWLER = 101
+    NOTIFICATION = 5; CUSTOM = 99; DEV = 100; CRAWLER = 101;
+    REPORTER = 102; ANALYTICS = 103; VALIDATION = 104
 end
 
 @enum AgentStatus begin

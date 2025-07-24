@@ -20,6 +20,7 @@ export async function PUT(req: NextRequest, context: { params: { id: string } })
   const body = await req.json();
   // Julia expects { state: ... } for status update
   const payload = { state: body.state || body.status };
+  console.log("PUT /api/agents/[id] payload:", payload); // Debug log
   try {
     const juliaRes = await fetch(`${JULIA_API_BASE}/${id}`, {
       method: 'PUT',

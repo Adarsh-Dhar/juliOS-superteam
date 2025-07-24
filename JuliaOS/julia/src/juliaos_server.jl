@@ -40,7 +40,10 @@ const AGENT_TYPE_MAP = Dict(
     "NOTIFICATION" => AgentCore.NOTIFICATION,
     "CUSTOM" => AgentCore.CUSTOM,
     "DEV" => AgentCore.DEV,
-    "CRAWLER" => AgentCore.CRAWLER
+    "CRAWLER" => AgentCore.CRAWLER,
+    "REPORTER" => AgentCore.REPORTER,
+    "ANALYTICS" => AgentCore.ANALYTICS,
+    "VALIDATION" => AgentCore.VALIDATION
 )
 
 const AGENT_STATUS_MAP = Dict(
@@ -90,10 +93,12 @@ end
 function list_agents(req::HTTP.Request)
     @info "Triggered endpoint: GET /agents"
     agent_objs = Agents.listAgents()
-    # Map to API model: id, name, state (state = status as string, only CREATED, RUNNING, PAUSED, STOPPED allowed)
+    # Map to API model: id, name, type, status, state (state = status as string, only CREATED, RUNNING, PAUSED, STOPPED allowed)
     api_agents = [Dict(
         "id" => ag.id,
         "name" => ag.name,
+        "type" => string(ag.type),
+        "status" => string(ag.status),
         "state" => string(ag.status) in ["CREATED","RUNNING","PAUSED","STOPPED"] ? string(ag.status) : "STOPPED"
     ) for ag in agent_objs]
     return HTTP.Response(200, JSON.json(api_agents))

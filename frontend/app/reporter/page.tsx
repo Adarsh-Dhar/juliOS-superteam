@@ -1,7 +1,9 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 const AGENT_TYPE = "REPORTER";
+const AGENT_STATES = ["ACTIVE", "OFFLINE"];
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(" ");
@@ -14,6 +16,9 @@ export default function ReporterDashboard() {
   const [error, setError] = useState("");
   const [proofs, setProofs] = useState<any[]>([]);
   const [proofsLoading, setProofsLoading] = useState(false);
+  const { toast } = useToast();
+  const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
+  const [editingState, setEditingState] = useState<string>("");
 
   async function fetchAgents() {
     setLoading(true);
@@ -21,7 +26,8 @@ export default function ReporterDashboard() {
     try {
       const res = await fetch("/api/agents");
       const data = await res.json();
-      setAgents(data.filter((a: any) => a.type === AGENT_TYPE));
+      console.log("data", data);
+      setAgents(data);
     } catch (e) {
       setError("Failed to fetch agents");
     }
@@ -76,14 +82,15 @@ export default function ReporterDashboard() {
     setLoading(false);
   }
 
-  async function updateAgentStatus(id: string, status: string) {
+  async function updateAgentStatus(id: string, state: string) {
     setLoading(true);
     setError("");
     try {
+      // You may need to update this endpoint if you want to support updating state via backend
       await fetch(`/api/agents/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ state }),
       });
       fetchAgents();
     } catch (e) {
@@ -93,12 +100,12 @@ export default function ReporterDashboard() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-10 px-4">
-      <h1 className="text-3xl font-bold mb-6 text-center">Reporter Agents</h1>
+    <div className="max-w-3xl mx-auto py-10 px-4 text-white">
+      <h1 className="text-3xl font-bold mb-6 text-center holographic-text">Reporter Agents</h1>
       <form onSubmit={addAgent} className="flex gap-2 mb-8 justify-center">
         <input
           type="text"
-          className="input input-bordered w-full max-w-xs border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="input input-bordered w-full max-w-xs border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[#181c2b] text-white placeholder-gray-400"
           placeholder="New reporter name"
           value={name}
           onChange={e => setName(e.target.value)}
@@ -114,61 +121,98 @@ export default function ReporterDashboard() {
       </form>
       {error && <div className="text-red-500 mb-4 text-center">{error}</div>}
       <div className="overflow-x-auto mb-12">
-        <table className="min-w-full bg-white border rounded shadow">
+        <table className="min-w-full glassmorphism border rounded shadow text-white">
           <thead>
-            <tr className="bg-gray-100">
-              <th className="py-2 px-4 text-left">Name</th>
-              <th className="py-2 px-4 text-left">Status</th>
-              <th className="py-2 px-4 text-left">Processed</th>
-              <th className="py-2 px-4 text-left">Accuracy</th>
-              <th className="py-2 px-4 text-left">Last Active</th>
-              <th className="py-2 px-4">Actions</th>
+            <tr className="bg-gray-800">
+              <th className="py-2 px-4 text-left font-exo2 text-gray-300">Name</th>
+              <th className="py-2 px-4 text-left font-exo2 text-gray-300">Status</th>
+              <th className="py-2 px-4 text-left font-exo2 text-gray-300">Processed</th>
+              <th className="py-2 px-4 text-left font-exo2 text-gray-300">Accuracy</th>
+              <th className="py-2 px-4 text-left font-exo2 text-gray-300">Last Active</th>
+              <th className="py-2 px-4 font-exo2 text-gray-300">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="text-center py-6">Loading...</td>
+                <td colSpan={6} className="text-center py-6 text-gray-400">Loading...</td>
               </tr>
             ) : agents.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-6 text-gray-400">No reporter agents found.</td>
+                <td colSpan={6} className="text-center py-6 text-gray-500">No reporter agents found.</td>
               </tr>
             ) : (
               agents.map(agent => (
-                <tr key={agent.id} className="border-t">
-                  <td className="py-2 px-4 font-medium">{agent.name}</td>
+                <tr key={agent.id} className="border-t border-gray-700 hover:bg-gray-900 transition">
+                  <td className="py-2 px-4 font-medium text-white">{agent.name}</td>
                   <td className="py-2 px-4">
-                    <span className={classNames(
-                      "inline-block px-2 py-1 rounded text-xs font-semibold",
-                      agent.status === "ACTIVE"
-                        ? "bg-green-100 text-green-700"
-                        : agent.status === "OFFLINE"
-                        ? "bg-gray-200 text-gray-500"
-                        : "bg-yellow-100 text-yellow-700"
-                    )}>
-                      {agent.status}
-                    </span>
+                    {editingAgentId === agent.id ? (
+                      <>
+                        <select
+                          className="bg-gray-800 text-white px-2 py-1 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                          value={editingState}
+                          onChange={e => setEditingState(e.target.value)}
+                        >
+                          <option value="" disabled>Select state</option>
+                          {AGENT_STATES.map(state => (
+                            <option key={state} value={state}>{state}</option>
+                          ))}
+                        </select>
+                        <button
+                          className="bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 text-xs ml-2"
+                          onClick={() => updateAgentStatus(agent.id, editingState)}
+                          disabled={loading || !editingState}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="bg-gray-500 text-white px-2 py-1 rounded hover:bg-gray-600 text-xs ml-1"
+                          onClick={() => { setEditingAgentId(null); setEditingState(""); }}
+                          disabled={loading}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className={classNames(
+                          "inline-block px-2 py-1 rounded text-xs font-semibold",
+                          agent.state === "ACTIVE"
+                            ? "bg-green-900 text-green-400"
+                            : agent.state === "OFFLINE"
+                            ? "bg-gray-800 text-gray-400"
+                            : "bg-yellow-900 text-yellow-400"
+                        )}>
+                          {agent.state}
+                        </span>
+                        <button
+                          className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-xs ml-2"
+                          onClick={() => { setEditingAgentId(agent.id); setEditingState(agent.state || ""); }}
+                          disabled={loading}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-xs ml-2"
+                          onClick={() => updateAgentStatus(agent.id, agent.state === "ACTIVE" ? "OFFLINE" : "ACTIVE")}
+                          disabled={loading}
+                        >
+                          {agent.state === "ACTIVE" ? "Stop" : "Start"}
+                        </button>
+                        <button
+                          className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-xs ml-2"
+                          onClick={() => removeAgent(agent.id)}
+                          disabled={loading}
+                        >
+                          Remove
+                        </button>
+                      </>
+                    )}
                   </td>
-                  <td className="py-2 px-4">{agent.processedCount}</td>
-                  <td className="py-2 px-4">{agent.accuracy?.toFixed(2)}</td>
-                  <td className="py-2 px-4">{agent.lastActiveAt ? new Date(agent.lastActiveAt).toLocaleString() : "-"}</td>
-                  <td className="py-2 px-4 flex gap-2">
-                    <button
-                      className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 text-xs"
-                      onClick={() => updateAgentStatus(agent.id, agent.status === "ACTIVE" ? "OFFLINE" : "ACTIVE")}
-                      disabled={loading}
-                    >
-                      {agent.status === "ACTIVE" ? "Stop" : "Start"}
-                    </button>
-                    <button
-                      className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 text-xs"
-                      onClick={() => removeAgent(agent.id)}
-                      disabled={loading}
-                    >
-                      Remove
-                    </button>
-                  </td>
+                  <td className="py-2 px-4 text-gray-200">{agent.processedCount ?? '-'}</td>
+                  <td className="py-2 px-4 text-gray-200">{agent.accuracy !== undefined ? agent.accuracy.toFixed(2) : '-'}</td>
+                  <td className="py-2 px-4 text-gray-400">{agent.lastActiveAt ? new Date(agent.lastActiveAt).toLocaleString() : "-"}</td>
+                  <td className="py-2 px-4 flex gap-2 items-center"></td>
                 </tr>
               ))
             )}
