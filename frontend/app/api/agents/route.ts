@@ -4,14 +4,13 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  // List all CRAWLER agents with required fields
+  // List all agents with required fields
   const agents = await prisma.agent.findMany({
-    where: { type: 'CRAWLER' },
     select: {
       id: true,
-      name: true,
       type: true,
       status: true,
+      location: true,
       processedCount: true,
       accuracy: true,
       lastActiveAt: true,
@@ -19,31 +18,31 @@ export async function GET() {
     orderBy: { createdAt: 'desc' },
   });
 
-  // Map status based on lastActiveAt (active if within last 5 min)
-  const now = Date.now();
+  // Map status based on backend status
   const mappedAgents = agents.map(agent => ({
     ...agent,
-    status:
-      agent.lastActiveAt && new Date(agent.lastActiveAt).getTime() > now - 5 * 60 * 1000
-        ? 'ACTIVE'
-        : 'OFFLINE',
+    status: agent.status === 'RUNNING' ? 'ACTIVE' : 'OFFLINE',
   }));
 
   return NextResponse.json(mappedAgents);
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  if (!body.name || !body.type) {
-    return NextResponse.json({ error: 'Missing name or type' }, { status: 400 });
+  const data = await req.json();
+  const { type, name, status } = data;
+  if (!type || !name) {
+    return NextResponse.json({ error: 'Missing type or name' }, { status: 400 });
   }
-
   // Proxy the request to the Julia backend
   try {
     const juliaRes = await fetch('http://localhost:8052/api/v1/agents', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        name,
+        type,
+        status: status || 'ACTIVE',
+      }),
     });
     const juliaData = await juliaRes.json();
     return NextResponse.json(juliaData, { status: juliaRes.status });

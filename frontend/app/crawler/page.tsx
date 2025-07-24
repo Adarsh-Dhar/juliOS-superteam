@@ -42,7 +42,7 @@ export default function CrawlerDashboard() {
       const res = await fetch("/api/agents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: AGENT_TYPE, name }),
+        body: JSON.stringify({ type: AGENT_TYPE, name, status: "ACTIVE" }),
       });
       if (!res.ok) throw new Error("Failed to add agent");
       setName("");
@@ -50,6 +50,7 @@ export default function CrawlerDashboard() {
       toast({ title: "Agent Added", description: "Crawler agent added successfully." });
     } catch (e) {
       setError("Failed to add agent");
+      console.error("Failed to add agent", e);
       toast({ title: "Error", description: "Failed to add agent" });
     }
     setLoading(false);
