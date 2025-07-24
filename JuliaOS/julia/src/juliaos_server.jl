@@ -12,6 +12,18 @@ using .Config
 include("agents/AgentCore.jl")
 using .AgentCore: Agent, AgentType, AgentStatus, AgentConfig, SkillState, TaskResult, OrderedDictAgentMemory, PriorityAgentQueue
 
+include("agents/AgentMetrics.jl")
+using .AgentMetrics
+
+include("agents/Persistence.jl")
+using .Persistence
+
+include("agents/LLMIntegration.jl")
+using .LLMIntegration
+
+include("agents/Agents.jl")
+using .Agents
+
 @info "AgentType fields: $(fieldnames(AgentType))"
 
 include("api/server/src/JuliaOSServer.jl")
@@ -19,7 +31,6 @@ include("api/server/src/JuliaOSServer.jl")
 using .JuliaOSServer
 
 const server = Ref{Any}(nothing)
-const agents = Vector{AgentCore.Agent}()
 
 const AGENT_TYPE_MAP = Dict(
     "TRADING" => AgentCore.TRADING,
@@ -47,12 +58,9 @@ function create_agent(req::HTTP.Request)
     body = String(req.body)
     data = JSON.parse(body)
 
-    agent_id = haskey(data, "id") ? data["id"] : string(uuid4())
     agent_name = data["name"]
     agent_type = AGENT_TYPE_MAP[uppercase(data["type"])]
-    agent_status = haskey(data, "status") ? AGENT_STATUS_MAP[uppercase(data["status"])] : AgentCore.CREATED  # Map string to AgentStatus, default CREATED
 
-    now = Dates.now()
     agent_config = AgentConfig(
         agent_name,
         agent_type;
@@ -64,45 +72,11 @@ function create_agent(req::HTTP.Request)
         queue_config = get(data, "queue_config", Dict{String,Any}()),
         max_task_history = get(data, "max_task_history", Config.get_config("agent.max_task_history", 100))
     )
-    agent_memory = OrderedDictAgentMemory(OrderedDict{String, Any}(), 1000)  # Replace with your default memory type
-    agent_task_history = Vector{Dict{String,Any}}()
-    agent_skills = Dict{String,SkillState}()
-    agent_queue = PriorityAgentQueue(PriorityQueue{Any, Float64}())  # Replace with your default queue type
-    agent_task_results = Dict{String, TaskResult}()
-    agent_llm_integration = nothing
-    agent_swarm_connection = nothing
-    agent_lock = ReentrantLock()
-    agent_condition = Condition()
-    agent_last_error = nothing
-    agent_last_error_timestamp = nothing
-    agent_last_activity = now
 
-    agent = AgentCore.Agent(
-        agent_id,
-        agent_name,
-        agent_type,
-        agent_status,
-        now,
-        now,
-        agent_config,
-        agent_memory,
-        agent_task_history,
-        agent_skills,
-        agent_queue,
-        agent_task_results,
-        agent_llm_integration,
-        agent_swarm_connection,
-        agent_lock,
-        agent_condition,
-        agent_last_error,
-        agent_last_error_timestamp,
-        agent_last_activity
-    )
+    agent = Agents.createAgent(agent_config)
 
-    push!(agents, agent)
     @info "Created agent $(agent.id)"
 
-    # Return a summary as JSON
     return HTTP.Response(201, JSON.json(Dict(
         "id" => agent.id,
         "name" => agent.name,
@@ -110,14 +84,19 @@ function create_agent(req::HTTP.Request)
         "status" => string(agent.status),
         "created" => string(agent.created),
         "updated" => string(agent.updated)
-        # ... add more fields as needed ...
     )))
 end
 
 function list_agents(req::HTTP.Request)
     @info "Triggered endpoint: GET /agents"
-    @info "NYI, not actually listing agents..."
-    return agents
+    agent_objs = Agents.listAgents()
+    # Map to API model: id, name, state (state = status as string, only CREATED, RUNNING, PAUSED, STOPPED allowed)
+    api_agents = [Dict(
+        "id" => ag.id,
+        "name" => ag.name,
+        "state" => string(ag.status) in ["CREATED","RUNNING","PAUSED","STOPPED"] ? string(ag.status) : "STOPPED"
+    ) for ag in agent_objs]
+    return HTTP.Response(200, JSON.json(api_agents))
 end
 
 function ping(::HTTP.Request)
@@ -127,14 +106,49 @@ end
 
 function update_agent(req::HTTP.Request, agent_id::String, update::AgentUpdate)
     @info "Triggered endpoint: PUT /agents/$(agent_id)"
-    @info "NYI, not actually updating agent $(agent_id)..."
-    return nothing
+    ag = Agents.getAgent(agent_id)
+    if ag === nothing
+        return HTTP.Response(404, JSON.json(Dict("error" => "Agent not found")))
+    end
+    new_state = update.state
+    valid_states = ["RUNNING", "PAUSED", "STOPPED"]
+    if new_state === nothing || !(new_state in valid_states)
+        return HTTP.Response(400, JSON.json(Dict("error" => "Invalid or missing state. Must be one of: RUNNING, PAUSED, STOPPED.")))
+    end
+    success = false
+    if new_state == "RUNNING"
+        if ag.status == Agents.PAUSED
+            success = Agents.resumeAgent(agent_id)
+        elseif ag.status != Agents.RUNNING
+            success = Agents.startAgent(agent_id)
+        else
+            success = true
+        end
+    elseif new_state == "PAUSED"
+        success = Agents.pauseAgent(agent_id)
+    elseif new_state == "STOPPED"
+        success = Agents.stopAgent(agent_id)
+    end
+    if !success
+        return HTTP.Response(500, JSON.json(Dict("error" => "Failed to update agent state")))
+    end
+    # Return the intended state, not the actual (possibly lagging) state
+    api_agent = Dict(
+        "id" => ag.id,
+        "name" => ag.name,
+        "state" => new_state
+    )
+    return HTTP.Response(200, JSON.json(api_agent))
 end
 
 function delete_agent(req::HTTP.Request, agent_id::String)
     @info "Triggered endpoint: DELETE /agents/$(agent_id)"
-    @info "NYI, not actually deleting agent $(agent_id)..."
-    return nothing
+    success = Agents.deleteAgent(agent_id)
+    if success
+        return HTTP.Response(204, "")
+    else
+        return HTTP.Response(404, JSON.json(Dict("error" => "Agent not found")))
+    end
 end
 
 function process_agent_webhook(req::HTTP.Request, agent_id::String, payload::Dict{String, Any})
