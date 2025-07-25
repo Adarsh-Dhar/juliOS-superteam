@@ -1,19 +1,33 @@
-[toolchain]
-package_manager = "yarn"
-
 [features]
-resolution = true
+seeds = false
 skip-lint = false
 
 [programs.localnet]
-contract = "BEo6QRcNjibKhERUkVn6WaY9fwt1rmv8oc77x4Faog6L"
+access_nft = "8B6KZ6y2F949x5XJYyYbkhGpTGxgd9j7riskn4EsMet4"
+
+[programs.devnet]
+access_nft = "8B6KZ6y2F949x5XJYyYbkhGpTGxgd9j7riskn4EsMet4"
+
+[programs.mainnet]
+access_nft = "8B6KZ6y2F949x5XJYyYbkhGpTGxgd9j7riskn4EsMet4"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[[test.genesis]]
+address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+program = "metadata.so"
+
+[test.validator]
+bind_address = "127.0.0.1"
+url = "https://api.devnet.solana.com"
+clone = [
+  { address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s" },
+]
