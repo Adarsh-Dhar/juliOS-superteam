@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { useConnection } from '@solana/wallet-adapter-react';
 import { useContract } from '@/hooks/useContract';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,15 +13,14 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle, XCircle, Wallet, Shield, Settings, Info } from 'lucide-react';
 
 export function ContractExample() {
-  const [connection] = useState(() => new Connection('https://api.devnet.solana.com'));
+  const { publicKey, connected, signTransaction } = useWallet();
+  const { connection } = useConnection();
   const { 
     loading, 
     error, 
     mintNFT, 
     verifyUserAccess, 
-    updateCampaign, 
     getCampaign, 
-    checkAccess, 
     clearError 
   } = useContract(connection);
 
@@ -30,104 +30,127 @@ export function ContractExample() {
   const [campaignSymbol, setCampaignSymbol] = useState('');
   const [campaignUri, setCampaignUri] = useState('');
   const [agentCount, setAgentCount] = useState(1);
-  const [userPublicKey, setUserPublicKey] = useState('');
-  const [newUri, setNewUri] = useState('');
-  const [newAgentCount, setNewAgentCount] = useState(1);
 
   // Results
   const [mintResult, setMintResult] = useState<string | null>(null);
   const [verifyResult, setVerifyResult] = useState<boolean | null>(null);
   const [campaignData, setCampaignData] = useState<any>(null);
-  const [accessResult, setAccessResult] = useState<boolean | null>(null);
 
   const handleMintNFT = async () => {
-    const payer = Keypair.generate();
-    const mintAuthority = Keypair.generate();
-    
-    const result = await mintNFT({
-      campaignId,
-      name: campaignName,
-      symbol: campaignSymbol,
-      uri: campaignUri,
-      agentCount,
-      payer,
-      mintAuthority,
-    });
-    
-    setMintResult(result);
+    if (!connected || !publicKey || !signTransaction) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    clearError();
+    setMintResult(null);
+
+    try {
+      const result = await mintNFT({
+        campaignId,
+        name: campaignName,
+        symbol: campaignSymbol,
+        uri: campaignUri,
+        agentCount,
+        payer: publicKey,
+        mintAuthority: publicKey,
+        signTransaction,
+      });
+      
+      if (result) {
+        setMintResult(result);
+      }
+    } catch (err) {
+      console.error('Minting failed:', err);
+    }
   };
 
   const handleVerifyAccess = async () => {
-    const user = Keypair.generate();
-    const result = await verifyUserAccess({
-      campaignId,
-      user,
-    });
-    
-    setVerifyResult(result);
+    if (!connected || !publicKey || !signTransaction) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    clearError();
+    setVerifyResult(null);
+
+    try {
+      const wallet = {
+        publicKey,
+        signTransaction,
+        signAllTransactions: async (transactions: any[]) => {
+          const signedTransactions = [];
+          for (const transaction of transactions) {
+            signedTransactions.push(await signTransaction(transaction));
+          }
+          return signedTransactions;
+        },
+      };
+      
+      const result = await verifyUserAccess(wallet, campaignId);
+      setVerifyResult(result);
+    } catch (err) {
+      console.error('Verification failed:', err);
+    }
   };
 
   const handleGetCampaign = async () => {
-    const result = await getCampaign({ campaignId });
-    setCampaignData(result);
-  };
+    if (!connected || !publicKey || !signTransaction) {
+      alert('Please connect your wallet first');
+      return;
+    }
 
-  const handleCheckAccess = async () => {
-    if (!userPublicKey) return;
-    
-    const result = await checkAccess(new PublicKey(userPublicKey), campaignId);
-    setAccessResult(result);
-  };
+    clearError();
+    setCampaignData(null);
 
-  const handleUpdateCampaign = async () => {
-    const authority = Keypair.generate();
-    const result = await updateCampaign({
-      campaignId,
-      authority,
-      newUri: newUri || undefined,
-      newAgentCount: newAgentCount || undefined,
-    });
-    
-    if (result) {
-      setMintResult(result);
+    try {
+      const wallet = {
+        publicKey,
+        signTransaction,
+        signAllTransactions: async (transactions: any[]) => {
+          const signedTransactions = [];
+          for (const transaction of transactions) {
+            signedTransactions.push(await signTransaction(transaction));
+          }
+          return signedTransactions;
+        },
+      };
+      
+      const result = await getCampaign(wallet, campaignId);
+      setCampaignData(result);
+    } catch (err) {
+      console.error('Get campaign failed:', err);
     }
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Solana Contract Functions</h1>
-        <p className="text-muted-foreground">
-          Example usage of the access NFT contract functions
-        </p>
-      </div>
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Shield className="w-5 h-5" />
+            <span>Access NFT Contract Example</span>
+          </CardTitle>
+          <CardDescription>
+            Test the Access NFT contract functions. Make sure your wallet is connected.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Wallet Status */}
+          <div className="flex items-center space-x-2">
+            <Wallet className="w-4 h-4" />
+            <span className="text-sm">
+              Wallet Status: {connected ? (
+                <Badge variant="default" className="ml-2">Connected</Badge>
+              ) : (
+                <Badge variant="secondary" className="ml-2">Not Connected</Badge>
+              )}
+            </span>
+          </div>
 
-      {error && (
-        <Alert variant="destructive">
-          <XCircle className="h-4 w-4" />
-          <AlertDescription>
-            {error}
-            <Button variant="link" onClick={clearError} className="p-0 h-auto">
-              Dismiss
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Mint NFT */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
-              Mint Access NFT
-            </CardTitle>
-            <CardDescription>
-              Create a new access NFT for a campaign
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
+          {/* Form Fields */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
               <Label htmlFor="campaignId">Campaign ID</Label>
               <Input
                 id="campaignId"
@@ -136,272 +159,118 @@ export function ContractExample() {
                 placeholder="Enter campaign ID"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="name">NFT Name</Label>
+            <div>
+              <Label htmlFor="campaignName">NFT Name</Label>
               <Input
-                id="name"
+                id="campaignName"
                 value={campaignName}
                 onChange={(e) => setCampaignName(e.target.value)}
-                placeholder="Access NFT"
+                placeholder="Enter NFT name"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="symbol">Symbol</Label>
+            <div>
+              <Label htmlFor="campaignSymbol">NFT Symbol</Label>
               <Input
-                id="symbol"
+                id="campaignSymbol"
                 value={campaignSymbol}
                 onChange={(e) => setCampaignSymbol(e.target.value)}
-                placeholder="ACCESS"
+                placeholder="Enter NFT symbol"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="uri">Metadata URI</Label>
+            <div>
+              <Label htmlFor="campaignUri">Metadata URI</Label>
               <Input
-                id="uri"
+                id="campaignUri"
                 value={campaignUri}
                 onChange={(e) => setCampaignUri(e.target.value)}
-                placeholder="https://example.com/metadata.json"
+                placeholder="Enter metadata URI"
               />
             </div>
-            <div className="space-y-2">
+            <div>
               <Label htmlFor="agentCount">Agent Count</Label>
               <Input
                 id="agentCount"
                 type="number"
                 value={agentCount}
-                onChange={(e) => setAgentCount(parseInt(e.target.value))}
-                min="1"
+                onChange={(e) => setAgentCount(parseInt(e.target.value) || 1)}
+                placeholder="Enter agent count"
               />
             </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex space-x-4">
             <Button 
               onClick={handleMintNFT} 
-              disabled={loading || !campaignId || !campaignName || !campaignSymbol || !campaignUri}
-              className="w-full"
+              disabled={!connected || loading}
+              className="flex items-center space-x-2"
             >
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Mint NFT
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+              <span>Mint NFT</span>
             </Button>
-            {mintResult && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                <p className="text-sm text-green-800">
-                  <CheckCircle className="inline h-4 w-4 mr-1" />
-                  Transaction successful! Signature: {mintResult.slice(0, 8)}...
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Verify Access */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Verify Access
-            </CardTitle>
-            <CardDescription>
-              Verify if a user has access to a campaign
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="verifyCampaignId">Campaign ID</Label>
-              <Input
-                id="verifyCampaignId"
-                value={campaignId}
-                onChange={(e) => setCampaignId(e.target.value)}
-                placeholder="Enter campaign ID"
-              />
-            </div>
+            
             <Button 
               onClick={handleVerifyAccess} 
-              disabled={loading || !campaignId}
-              className="w-full"
+              disabled={!connected || loading}
+              variant="outline"
+              className="flex items-center space-x-2"
             >
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Verify Access
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+              <span>Verify Access</span>
             </Button>
-            {verifyResult !== null && (
-              <div className={`p-3 border rounded-md ${verifyResult ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                <p className={`text-sm ${verifyResult ? 'text-green-800' : 'text-red-800'}`}>
-                  {verifyResult ? (
-                    <>
-                      <CheckCircle className="inline h-4 w-4 mr-1" />
-                      Access verified successfully!
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="inline h-4 w-4 mr-1" />
-                      Access denied
-                    </>
-                  )}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Get Campaign Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Info className="h-5 w-5" />
-              Get Campaign Info
-            </CardTitle>
-            <CardDescription>
-              Retrieve campaign information
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="infoCampaignId">Campaign ID</Label>
-              <Input
-                id="infoCampaignId"
-                value={campaignId}
-                onChange={(e) => setCampaignId(e.target.value)}
-                placeholder="Enter campaign ID"
-              />
-            </div>
+            
             <Button 
               onClick={handleGetCampaign} 
-              disabled={loading || !campaignId}
-              className="w-full"
+              disabled={!connected || loading}
+              variant="outline"
+              className="flex items-center space-x-2"
             >
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Get Campaign Info
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Info className="w-4 h-4" />}
+              <span>Get Campaign</span>
             </Button>
-            {campaignData && (
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium">ID:</span>
-                  <Badge variant="secondary">{campaignData.id}</Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium">Agent Count:</span>
-                  <Badge variant="outline">{campaignData.agentCount}</Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium">Created:</span>
-                  <Badge variant="outline">
-                    {new Date(campaignData.createdAt * 1000).toLocaleDateString()}
-                  </Badge>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Check User Access */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Check User Access
-            </CardTitle>
-            <CardDescription>
-              Check if a specific user has access
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="userPublicKey">User Public Key</Label>
-              <Input
-                id="userPublicKey"
-                value={userPublicKey}
-                onChange={(e) => setUserPublicKey(e.target.value)}
-                placeholder="Enter user public key"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="accessCampaignId">Campaign ID</Label>
-              <Input
-                id="accessCampaignId"
-                value={campaignId}
-                onChange={(e) => setCampaignId(e.target.value)}
-                placeholder="Enter campaign ID"
-              />
-            </div>
-            <Button 
-              onClick={handleCheckAccess} 
-              disabled={loading || !userPublicKey || !campaignId}
-              className="w-full"
-            >
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Check Access
-            </Button>
-            {accessResult !== null && (
-              <div className={`p-3 border rounded-md ${accessResult ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                <p className={`text-sm ${accessResult ? 'text-green-800' : 'text-red-800'}`}>
-                  {accessResult ? (
-                    <>
-                      <CheckCircle className="inline h-4 w-4 mr-1" />
-                      User has access
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="inline h-4 w-4 mr-1" />
-                      User does not have access
-                    </>
-                  )}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          {/* Error Display */}
+          {error && (
+            <Alert>
+              <XCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
 
-        {/* Update Campaign */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              Update Campaign Data
-            </CardTitle>
-            <CardDescription>
-              Update campaign metadata (only by original mint authority)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="updateCampaignId">Campaign ID</Label>
-                <Input
-                  id="updateCampaignId"
-                  value={campaignId}
-                  onChange={(e) => setCampaignId(e.target.value)}
-                  placeholder="Enter campaign ID"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="newUri">New URI (optional)</Label>
-                <Input
-                  id="newUri"
-                  value={newUri}
-                  onChange={(e) => setNewUri(e.target.value)}
-                  placeholder="https://example.com/new-metadata.json"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="newAgentCount">New Agent Count (optional)</Label>
-                <Input
-                  id="newAgentCount"
-                  type="number"
-                  value={newAgentCount}
-                  onChange={(e) => setNewAgentCount(parseInt(e.target.value))}
-                  min="1"
-                />
-              </div>
-            </div>
-            <Button 
-              onClick={handleUpdateCampaign} 
-              disabled={loading || !campaignId}
-              className="w-full"
-            >
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Update Campaign
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Results Display */}
+          {mintResult && (
+            <Alert>
+              <CheckCircle className="h-4 w-4" />
+              <AlertDescription>
+                NFT minted successfully! Transaction: {mintResult.slice(0, 8)}...{mintResult.slice(-8)}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {verifyResult !== null && (
+            <Alert>
+              {verifyResult ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+              <AlertDescription>
+                {verifyResult ? 'Access verified successfully!' : 'Access denied.'}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {campaignData && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Campaign Information</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <pre className="text-sm bg-gray-100 p-4 rounded overflow-auto">
+                  {JSON.stringify(campaignData, null, 2)}
+                </pre>
+              </CardContent>
+            </Card>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 } 

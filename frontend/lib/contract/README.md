@@ -10,7 +10,7 @@ The contract is deployed at: `8B6KZ6y2F949x5XJYyYbkhGpTGxgd9j7riskn4EsMet4`
 
 ### 1. `mintAccessNFT`
 
-Mints an access NFT for a specific campaign.
+Mints an access NFT for a specific campaign using the connected wallet.
 
 ```typescript
 import { mintAccessNFT } from '@/lib/contract';
@@ -21,8 +21,9 @@ const signature = await mintAccessNFT(connection, {
   symbol: "ACCESS",
   uri: "https://example.com/metadata.json",
   agentCount: 5,
-  payer: payerKeypair,
-  mintAuthority: mintAuthorityKeypair,
+  payer: wallet.publicKey,
+  mintAuthority: wallet.publicKey,
+  signTransaction: wallet.signTransaction,
 });
 ```
 
@@ -33,8 +34,9 @@ const signature = await mintAccessNFT(connection, {
 - `symbol`: NFT symbol
 - `uri`: Metadata URI
 - `agentCount`: Number of agents in the campaign
-- `payer`: Keypair for paying transaction fees
-- `mintAuthority`: Keypair with mint authority
+- `payer`: Public key of the wallet paying transaction fees
+- `mintAuthority`: Public key of the wallet with mint authority
+- `signTransaction`: Function to sign the transaction with the connected wallet
 
 **Returns:** Transaction signature string
 
@@ -47,14 +49,16 @@ import { verifyAccess } from '@/lib/contract';
 
 const hasAccess = await verifyAccess(connection, {
   campaignId: "campaign-123",
-  user: userKeypair,
+  user: wallet.publicKey,
+  signTransaction: wallet.signTransaction,
 });
 ```
 
 **Parameters:**
 - `connection`: Solana connection object
 - `campaignId`: Campaign identifier
-- `user`: User's keypair
+- `user`: Public key of the user to verify
+- `signTransaction`: Function to sign the transaction with the connected wallet
 
 **Returns:** Boolean indicating access status
 
@@ -67,7 +71,8 @@ import { updateCampaignData } from '@/lib/contract';
 
 const signature = await updateCampaignData(connection, {
   campaignId: "campaign-123",
-  authority: authorityKeypair,
+  authority: wallet.publicKey,
+  signTransaction: wallet.signTransaction,
   newUri: "https://example.com/new-metadata.json", // optional
   newAgentCount: 10, // optional
 });
@@ -76,7 +81,8 @@ const signature = await updateCampaignData(connection, {
 **Parameters:**
 - `connection`: Solana connection object
 - `campaignId`: Campaign identifier
-- `authority`: Authority keypair (must be original mint authority)
+- `authority`: Public key of the authority (must be original mint authority)
+- `signTransaction`: Function to sign the transaction with the connected wallet
 - `newUri`: New metadata URI (optional)
 - `newAgentCount`: New agent count (optional)
 
@@ -154,9 +160,11 @@ For easier integration with React components, use the `useContract` hook:
 
 ```typescript
 import { useContract } from '@/hooks/useContract';
+import { useWallet } from '@solana/wallet-adapter-react';
 
 function MyComponent() {
   const connection = new Connection('https://api.devnet.solana.com');
+  const { publicKey, signTransaction } = useWallet();
   const { 
     loading, 
     error, 
@@ -169,14 +177,17 @@ function MyComponent() {
   } = useContract(connection);
 
   const handleMint = async () => {
+    if (!publicKey || !signTransaction) return;
+    
     const signature = await mintNFT({
       campaignId: "campaign-123",
       name: "Access NFT",
       symbol: "ACCESS",
       uri: "https://example.com/metadata.json",
       agentCount: 5,
-      payer: payerKeypair,
-      mintAuthority: mintAuthorityKeypair,
+      payer: publicKey,
+      mintAuthority: publicKey,
+      signTransaction,
     });
     
     if (signature) {
@@ -230,7 +241,7 @@ The contract functions work with any Solana network. For development, use:
 ## Security Notes
 
 1. Always validate user inputs before calling contract functions
-2. Use proper key management for production applications
+2. Use proper wallet integration for production applications
 3. Consider implementing rate limiting for public-facing functions
 4. Test thoroughly on devnet before deploying to mainnet
-5. Keep private keys secure and never expose them in client-side code 
+5. The frontend no longer requires private keys - all signing is done through the connected wallet 

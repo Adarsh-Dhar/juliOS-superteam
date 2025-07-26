@@ -1,1 +1,1 @@
-export const CONTRACT_ADDRESS = "8B6KZ6y2F949x5XJYyYbkhGpTGxgd9j7riskn4EsMet4";
+export const CONTRACT_ADDRESS = "CUsTj1BsTnrDeT2jNgioDHUNbxujMWjjnerMYUDs16kY";

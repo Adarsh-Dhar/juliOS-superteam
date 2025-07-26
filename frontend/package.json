@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.31.1",
     "@hookform/resolvers": "^3.9.0",
     "@metaplex-foundation/mpl-token-metadata": "^3.2.0",
     "@next/swc-wasm-nodejs": "13.5.1",
@@ -45,10 +46,12 @@
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/wallet-adapter-react-ui": "^0.9.39",
     "@solana/web3.js": "^1.90.0",
+    "@types/bs58": "^4.0.4",
     "@types/node": "20.6.2",
     "@types/react": "18.2.22",
     "@types/react-dom": "18.2.7",
     "autoprefixer": "10.4.15",
+    "bs58": "^6.0.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",

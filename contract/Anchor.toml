@@ -3,13 +3,13 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-access_nft = "Gi5Mqc3S5qmPB7WUMtqchXyEKZHH3N7GhLbvTRtbbeUZ"
+access_nft = "CUsTj1BsTnrDeT2jNgioDHUNbxujMWjjnerMYUDs16kY"
 
 [programs.devnet]
-access_nft = "Gi5Mqc3S5qmPB7WUMtqchXyEKZHH3N7GhLbvTRtbbeUZ"
+access_nft = "CUsTj1BsTnrDeT2jNgioDHUNbxujMWjjnerMYUDs16kY"
 
 [programs.mainnet]
-access_nft = "Gi5Mqc3S5qmPB7WUMtqchXyEKZHH3N7GhLbvTRtbbeUZ"
+access_nft = "CUsTj1BsTnrDeT2jNgioDHUNbxujMWjjnerMYUDs16kY"
 
 [registry]
 url = "https://api.apr.dev"
