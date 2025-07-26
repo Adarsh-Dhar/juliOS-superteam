@@ -3,31 +3,20 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-access_nft = "8B6KZ6y2F949x5XJYyYbkhGpTGxgd9j7riskn4EsMet4"
+access_nft = "Gi5Mqc3S5qmPB7WUMtqchXyEKZHH3N7GhLbvTRtbbeUZ"
 
 [programs.devnet]
-access_nft = "8B6KZ6y2F949x5XJYyYbkhGpTGxgd9j7riskn4EsMet4"
+access_nft = "Gi5Mqc3S5qmPB7WUMtqchXyEKZHH3N7GhLbvTRtbbeUZ"
 
 [programs.mainnet]
-access_nft = "8B6KZ6y2F949x5XJYyYbkhGpTGxgd9j7riskn4EsMet4"
+access_nft = "Gi5Mqc3S5qmPB7WUMtqchXyEKZHH3N7GhLbvTRtbbeUZ"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "Devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
-
-[[test.genesis]]
-address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
-program = "metadata.so"
-
-[test.validator]
-bind_address = "127.0.0.1"
-url = "https://api.devnet.solana.com"
-clone = [
-  { address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s" },
-]

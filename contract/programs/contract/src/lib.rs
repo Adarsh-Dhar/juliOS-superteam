@@ -8,7 +8,7 @@ use mpl_token_metadata::{
     types::{DataV2, Creator, CollectionDetails},
 };
 
-declare_id!("8B6KZ6y2F949x5XJYyYbkhGpTGxgd9j7riskn4EsMet4");
+declare_id!("Gi5Mqc3S5qmPB7WUMtqchXyEKZHH3N7GhLbvTRtbbeUZ");
 
 #[program]
 pub mod access_nft {
