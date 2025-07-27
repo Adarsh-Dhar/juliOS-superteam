@@ -50,8 +50,8 @@ interface CampaignForm {
   sentimentThreshold: number;
   
   // Resource Allocation
-  crawlerCount: number;
-  analyzerCount: number;
+  crawlerAgents: string[]; // Automatically generated based on platforms
+  consensusAgentCount: number; // Odd number of consensus agents
   budget: number;
   
   // Wallet Essentials
@@ -77,8 +77,8 @@ export default function CampaignPage() {
     hashtags: [],
     spamThreshold: 15,
     sentimentThreshold: 30,
-    crawlerCount: 3,
-    analyzerCount: 2,
+    crawlerAgents: [],
+    consensusAgentCount: 3, // Start with 3 consensus agents (odd number)
     budget: 100,
     walletConnected: false,
     walletAddress: '',
@@ -95,13 +95,21 @@ export default function CampaignPage() {
   const [nftSignature, setNftSignature] = useState<string | null>(null);
 
   const platforms = [
-    { id: 'twitter', name: 'Twitter', icon: '🐦' },
-    { id: 'reddit', name: 'Reddit', icon: '🤖' },
-    { id: 'discord', name: 'Discord', icon: '💬' },
-    { id: 'telegram', name: 'Telegram', icon: '📱' },
-    { id: 'instagram', name: 'Instagram', icon: '📸' },
-    { id: 'youtube', name: 'YouTube', icon: '📺' }
+    { id: 'twitter', name: 'Twitter', icon: '🐦', agent: 'twitter.jl' },
+    { id: 'reddit', name: 'Reddit', icon: '🤖', agent: 'reddit.jl' },
+    { id: 'discord', name: 'Discord', icon: '💬', agent: 'discord.jl' },
+    { id: 'telegram', name: 'Telegram', icon: '📱', agent: 'telegram.jl' },
+    { id: 'instagram', name: 'Instagram', icon: '📸', agent: 'instagram.jl' },
+    { id: 'youtube', name: 'YouTube', icon: '📺', agent: 'youtube.jl' }
   ];
+
+  // Function to generate crawler agents based on selected platforms
+  const generateCrawlerAgents = (selectedPlatforms: string[]) => {
+    return selectedPlatforms.map(platformId => {
+      const platform = platforms.find(p => p.id === platformId);
+      return platform?.agent || `${platformId}.jl`;
+    });
+  };
 
   // Update wallet connection status when wallet connects/disconnects
   useEffect(() => {
@@ -121,6 +129,15 @@ export default function CampaignPage() {
       }));
     }
   }, [connected, publicKey]);
+
+  // Update crawler agents when platforms change
+  useEffect(() => {
+    const generatedAgents = generateCrawlerAgents(formData.platforms);
+    setFormData(prev => ({
+      ...prev,
+      crawlerAgents: generatedAgents
+    }));
+  }, [formData.platforms]);
 
   const fetchWalletBalance = async () => {
     if (!connection || !publicKey) return;
@@ -176,6 +193,138 @@ export default function CampaignPage() {
     }
   };
 
+  // Function to create agents for the campaign
+  const createAgents = async (campaignId: string, campaignData: any) => {
+    const createdAgents = [];
+    const errors = [];
+
+    try {
+      // Step 1: Create crawler agents
+      console.log('=== CREATING CRAWLER AGENTS ===');
+      for (const agentName of formData.crawlerAgents) {
+        try {
+          const agentResponse = await fetch('/api/agents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: `${campaignId}_${agentName}`,
+              type: 'CRAWLER',
+              status: 'ACTIVE',
+              campaignId: campaignId,
+              agentConfig: {
+                platform: agentName.replace('.jl', ''),
+                keywords: formData.keywords,
+                hashtags: formData.hashtags,
+                spamThreshold: formData.spamThreshold,
+                sentimentThreshold: formData.sentimentThreshold
+              }
+            }),
+          });
+
+          if (agentResponse.ok) {
+            const agent = await agentResponse.json();
+            createdAgents.push(agent);
+            console.log(`Created crawler agent: ${agent.name} (${agent.id})`);
+          } else {
+            const errorText = await agentResponse.text();
+            errors.push(`Failed to create crawler agent ${agentName}: ${errorText}`);
+            console.error(`Failed to create crawler agent ${agentName}:`, errorText);
+          }
+        } catch (error) {
+          errors.push(`Error creating crawler agent ${agentName}: ${error}`);
+          console.error(`Error creating crawler agent ${agentName}:`, error);
+        }
+      }
+
+      // Step 2: Create fixed analyzer agents
+      console.log('=== CREATING FIXED ANALYZER AGENTS ===');
+      const fixedAnalyzers = ['sentiment_analyzer', 'trend_analyzer'];
+      
+      for (const analyzerName of fixedAnalyzers) {
+        try {
+          const agentResponse = await fetch('/api/agents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: `${campaignId}_${analyzerName}`,
+              type: analyzerName === 'sentiment_analyzer' ? 'SENTIMENT_ANALYZER' : 'TREND_ANALYZER',
+              status: 'ACTIVE',
+              campaignId: campaignId,
+              agentConfig: {
+                model: 'gpt-4',
+                threshold: formData.sentimentThreshold,
+                analysisType: analyzerName
+              }
+            }),
+          });
+
+          if (agentResponse.ok) {
+            const agent = await agentResponse.json();
+            createdAgents.push(agent);
+            console.log(`Created ${analyzerName} agent: ${agent.name} (${agent.id})`);
+          } else {
+            const errorText = await agentResponse.text();
+            errors.push(`Failed to create ${analyzerName} agent: ${errorText}`);
+            console.error(`Failed to create ${analyzerName} agent:`, errorText);
+          }
+        } catch (error) {
+          errors.push(`Error creating ${analyzerName} agent: ${error}`);
+          console.error(`Error creating ${analyzerName} agent:`, error);
+        }
+      }
+
+      // Step 3: Create consensus agents
+      console.log('=== CREATING CONSENSUS AGENTS ===');
+      for (let i = 1; i <= formData.consensusAgentCount; i++) {
+        try {
+          const agentResponse = await fetch('/api/agents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: `${campaignId}_consensus_agent_${i}`,
+              type: 'CONSENSUS',
+              status: 'ACTIVE',
+              campaignId: campaignId,
+              agentConfig: {
+                scoringMetrics: ['bot_likelihood', 'engagement_manipulation', 'content_authenticity'],
+                votingWeight: 1.0,
+                consensusThreshold: 0.6,
+                agentIndex: i,
+                totalConsensusAgents: formData.consensusAgentCount
+              }
+            }),
+          });
+
+          if (agentResponse.ok) {
+            const agent = await agentResponse.json();
+            createdAgents.push(agent);
+            console.log(`Created consensus agent ${i}: ${agent.name} (${agent.id})`);
+          } else {
+            const errorText = await agentResponse.text();
+            errors.push(`Failed to create consensus agent ${i}: ${errorText}`);
+            console.error(`Failed to create consensus agent ${i}:`, errorText);
+          }
+        } catch (error) {
+          errors.push(`Error creating consensus agent ${i}: ${error}`);
+          console.error(`Error creating consensus agent ${i}:`, error);
+        }
+      }
+
+      console.log('=== AGENT CREATION SUMMARY ===');
+      console.log('Total agents created:', createdAgents.length);
+      console.log('Crawler agents:', createdAgents.filter(a => a.type === 'CRAWLER').length);
+      console.log('Fixed analyzers:', createdAgents.filter(a => a.type === 'SENTIMENT_ANALYZER' || a.type === 'TREND_ANALYZER').length);
+      console.log('Consensus agents:', createdAgents.filter(a => a.type === 'CONSENSUS').length);
+      console.log('Errors:', errors.length);
+      console.log('=== END AGENT CREATION ===');
+
+      return { createdAgents, errors };
+    } catch (error) {
+      console.error('Error in createAgents:', error);
+      return { createdAgents: [], errors: [`Failed to create agents: ${error}`] };
+    }
+  };
+
   const handleSubmit = async () => {
     setSuccessMessage(null);
     setErrorMessage(null);
@@ -217,13 +366,23 @@ export default function CampaignPage() {
           hashtags: formData.hashtags,
           spamThreshold: formData.spamThreshold,
           sentimentThreshold: formData.sentimentThreshold,
-          crawlerCount: formData.crawlerCount,
-          analyzerCount: formData.analyzerCount,
+          crawlerAgents: formData.crawlerAgents,
+          consensusAgentCount: formData.consensusAgentCount,
+          fixedAnalyzers: ['sentiment_analyzer', 'trend_analyzer'],
           budget: formData.budget,
           walletAddress: formData.walletAddress,
           juliaOSAccount: formData.juliaOSAccount,
         }
       };
+
+      // Log campaign data before submission
+      console.log('=== FRONTEND CAMPAIGN SUBMISSION LOG ===');
+      console.log('Form Data:', formData);
+      console.log('Campaign Data to Submit:', campaignData);
+      console.log('Generated Crawler Agents:', formData.crawlerAgents);
+      console.log('Total Agents:', formData.crawlerAgents.length + formData.consensusAgentCount + 2);
+      console.log('Selected Platforms:', formData.platforms);
+      console.log('=== END FRONTEND LOG ===');
 
       const response = await fetch('/api/campaigns', {
         method: 'POST',
@@ -238,29 +397,92 @@ export default function CampaignPage() {
 
       const createdCampaign = await response.json();
       
-      // Step 2: Mint NFT for campaign access
+      // Log campaign creation response
+      console.log('=== CAMPAIGN CREATION RESPONSE LOG ===');
+      console.log('Created Campaign:', createdCampaign);
+      console.log('Campaign ID:', createdCampaign.id);
+      console.log('Campaign Name:', createdCampaign.name);
+      console.log('Campaign Metadata:', createdCampaign.metadata);
+      console.log('Agent Details:', createdCampaign.metadata?.agentDetails);
+      console.log('=== END RESPONSE LOG ===');
+      
+      // Step 2: Create agents
+      console.log('=== STARTING AGENT CREATION ===');
+      const { createdAgents, errors } = await createAgents(createdCampaign.id, campaignData);
+      
+      if (errors.length > 0) {
+        console.warn('Some agents failed to create:', errors);
+      }
+      
+      // Step 3: Mint NFT for campaign access
       if (connected && publicKey && signTransaction) {
         const nftParams = {
           campaignId: createdCampaign.id,
           name: `${formData.name} Access Token`,
           symbol: 'TGAP',
           uri: `https://ipfs.io/ipfs/Qm${Date.now()}`,
-          agentCount: formData.crawlerCount + formData.analyzerCount,
+          agentCount: createdAgents.length,
           payer: publicKey,
           mintAuthority: publicKey,
           signTransaction
         };
 
+        // Log NFT minting parameters
+        console.log('=== NFT MINTING LOG ===');
+        console.log('NFT Parameters:', nftParams);
+        console.log('Agent Count for NFT:', createdAgents.length);
+        console.log('Created Agents:', createdAgents.map(a => ({ name: a.name, type: a.type })));
+        console.log('=== END NFT LOG ===');
+
         const signature = await mintNFT(nftParams);
         
         if (signature) {
           setNftSignature(signature);
-          setSuccessMessage(`Campaign "${createdCampaign.name}" created successfully! Campaign ID: ${createdCampaign.id}. NFT minted with signature: ${signature.slice(0, 8)}...${signature.slice(-8)}`);
+          const successMsg = `Campaign "${createdCampaign.name}" created successfully! Campaign ID: ${createdCampaign.id}. Created ${createdAgents.length} agents. NFT minted with signature: ${signature.slice(0, 8)}...${signature.slice(-8)}`;
+          if (errors.length > 0) {
+            setSuccessMessage(`${successMsg} Note: ${errors.length} agents failed to create.`);
+          } else {
+            setSuccessMessage(successMsg);
+          }
+          
+          // Log successful campaign creation with NFT
+          console.log('=== SUCCESS LOG ===');
+          console.log('Campaign created successfully with NFT');
+          console.log('Campaign ID:', createdCampaign.id);
+          console.log('NFT Signature:', signature);
+          console.log('Total Agents Created:', createdAgents.length);
+          console.log('Agent Types:', createdAgents.map(a => a.type));
+          console.log('=== END SUCCESS LOG ===');
         } else {
-          setSuccessMessage(`Campaign "${createdCampaign.name}" created successfully! Campaign ID: ${createdCampaign.id}. NFT minting failed.`);
+          const partialMsg = `Campaign "${createdCampaign.name}" created successfully! Campaign ID: ${createdCampaign.id}. Created ${createdAgents.length} agents. NFT minting failed.`;
+          if (errors.length > 0) {
+            setSuccessMessage(`${partialMsg} Note: ${errors.length} agents failed to create.`);
+          } else {
+            setSuccessMessage(partialMsg);
+          }
+          
+          // Log campaign creation with NFT failure
+          console.log('=== PARTIAL SUCCESS LOG ===');
+          console.log('Campaign created but NFT minting failed');
+          console.log('Campaign ID:', createdCampaign.id);
+          console.log('Total Agents Created:', createdAgents.length);
+          console.log('=== END PARTIAL SUCCESS LOG ===');
         }
       } else {
-        setSuccessMessage(`Campaign "${createdCampaign.name}" created successfully! Campaign ID: ${createdCampaign.id}. Please connect wallet to mint access NFT.`);
+        const campaignMsg = `Campaign "${createdCampaign.name}" created successfully! Campaign ID: ${createdCampaign.id}. Created ${createdAgents.length} agents. Please connect wallet to mint access NFT.`;
+        if (errors.length > 0) {
+          setSuccessMessage(`${campaignMsg} Note: ${errors.length} agents failed to create.`);
+        } else {
+          setSuccessMessage(campaignMsg);
+        }
+        
+        // Log campaign creation without wallet
+        console.log('=== CAMPAIGN ONLY LOG ===');
+        console.log('Campaign created without wallet connection');
+        console.log('Campaign ID:', createdCampaign.id);
+        console.log('Wallet Connected:', connected);
+        console.log('Total Agents Created:', createdAgents.length);
+        console.log('=== END CAMPAIGN ONLY LOG ===');
       }
       
       // Reset form
@@ -272,8 +494,8 @@ export default function CampaignPage() {
         hashtags: [],
         spamThreshold: 15,
         sentimentThreshold: 30,
-        crawlerCount: 3,
-        analyzerCount: 2,
+        crawlerAgents: [],
+        consensusAgentCount: 3,
         budget: 100,
         walletConnected: formData.walletConnected,
         walletAddress: formData.walletAddress,
@@ -485,23 +707,33 @@ export default function CampaignPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-4">
-                    <Label>Crawler Agents: {formData.crawlerCount}</Label>
-                    <Slider
-                      value={[formData.crawlerCount]}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, crawlerCount: value[0] }))}
-                      max={10}
-                      min={1}
-                      step={1}
-                      className="w-full"
-                    />
-                    <p className="text-xs text-gray-400">Data collection agents for each platform</p>
+                    <Label>Crawler Agents: {formData.crawlerAgents.length}</Label>
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-400">Automatically generated based on selected platforms</p>
+                      {formData.crawlerAgents.length > 0 ? (
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap gap-2">
+                            {formData.crawlerAgents.map((agent, index) => (
+                              <Badge key={index} variant="secondary" className="bg-blue-500/20 text-blue-400">
+                                {agent}
+                              </Badge>
+                            ))}
+                          </div>
+                          <p className="text-xs text-gray-400">
+                            {formData.crawlerAgents.length} crawler agent{formData.crawlerAgents.length !== 1 ? 's' : ''} will be deployed
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-orange-400">No platforms selected - no crawler agents will be deployed</p>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-4">
-                    <Label>Analyzer Agents: {formData.analyzerCount}</Label>
+                    <Label>Analyzer Agents: {formData.consensusAgentCount}</Label>
                     <Slider
-                      value={[formData.analyzerCount]}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, analyzerCount: value[0] }))}
+                      value={[formData.consensusAgentCount]}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, consensusAgentCount: value[0] }))}
                       max={5}
                       min={1}
                       step={1}
@@ -544,7 +776,7 @@ export default function CampaignPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Total Agents:</span>
-                      <span className="text-white">{formData.crawlerCount + formData.analyzerCount}</span>
+                      <span className="text-white">{formData.crawlerAgents.length + formData.consensusAgentCount + 2}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -711,7 +943,7 @@ export default function CampaignPage() {
         return formData.name && formData.id && formData.platforms.length > 0 && 
                (formData.keywords.length > 0 || formData.hashtags.length > 0);
       case 1: // Resource Allocation
-        return formData.crawlerCount > 0 && formData.analyzerCount > 0 && formData.budget > 0;
+        return formData.crawlerAgents.length > 0 && formData.consensusAgentCount > 0 && formData.budget > 0;
       case 2: // Wallet Setup
         return formData.walletConnected && formData.solBalance >= 0.002;
       case 3: // JuliaOS Access

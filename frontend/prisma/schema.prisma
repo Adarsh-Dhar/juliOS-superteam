@@ -25,6 +25,9 @@ enum VerificationStatus {
 
 enum AgentType {
   CRAWLER
+  SENTIMENT_ANALYZER
+  TREND_ANALYZER
+  CONSENSUS
   VALIDATOR
   ANALYTICS
   REPORTER
@@ -64,6 +67,7 @@ model Campaign {
   endDate           DateTime?
   posts             Post[]
   trustScore        Float         @default(0.0)
+  metadata          Json?         // Store crawler agents, platforms, etc.
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
@@ -130,6 +134,7 @@ model Agent {
   votes             Vote[]
   location          String?       // e.g., "us-east-1"
   version           String?
+  metadata          Json?         // Store campaign-specific configuration
   createdAt         DateTime      @default(now())
   // Relations to new models
   contentItems      ContentItem[]
