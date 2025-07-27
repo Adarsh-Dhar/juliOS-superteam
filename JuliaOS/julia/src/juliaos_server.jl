@@ -52,6 +52,12 @@ include("agents/analysis/sentiment.jl")
 
 include("agents/analysis/trend.jl")
 
+include("agents/consensusVerifier.jl")
+using .ConsensusVerifier
+
+include("agents/ConsensusSwarm.jl")
+using .ConsensusSwarm
+
 @info "AgentType fields: $(fieldnames(AgentType))"
 @info "Analysis modules loaded successfully"
 
@@ -111,6 +117,8 @@ register_custom_agent_type("SENTIMENTANALYZER", SentimentAgent)
 
 register_custom_agent_type("TRENDANALYZER", TrendAgent)
 
+register_custom_agent_type("CONSENSUSCOORDINATOR", ConsensusSwarm.ConsensusCoordinator)
+
 @info "Registered custom agents: $(keys(CUSTOM_AGENT_REGISTRY))"
 @info "SentimentAgent registered: $(haskey(CUSTOM_AGENT_REGISTRY, "SENTIMENTANALYZER"))"
 @info "TrendAgent registered: $(haskey(CUSTOM_AGENT_REGISTRY, "TRENDANALYZER"))"
@@ -131,12 +139,13 @@ function create_agent(req::HTTP.Request)
     if haskey(CUSTOM_AGENT_REGISTRY, agent_type_str)
         @info "Found custom agent type: $agent_type_str"
         return create_custom_agent(data, agent_type_str)
+    elseif haskey(AGENT_TYPE_MAP, agent_type_str)
+        @info "Agent type $agent_type_str found in standard types"
+        agent_type = AGENT_TYPE_MAP[agent_type_str]
     else
-        @info "Agent type $agent_type_str not found in custom registry, checking standard types"
+        @error "Unknown agent type: $agent_type_str"
+        return HTTP.Response(400, JSON.json(Dict("error" => "Unknown agent type: $agent_type_str")))
     end
-    
-    # Handle standard agent types
-    agent_type = AGENT_TYPE_MAP[agent_type_str]
 
     agent_config = AgentConfig(
         agent_name,
@@ -253,6 +262,20 @@ function create_custom_agent(data::Dict, agent_type_str::String)
             @error "Stacktrace: $(stacktrace())"
             return HTTP.Response(500, JSON.json(Dict("error" => "Failed to create TrendAgent: $e")))
         end
+    elseif agent_type_class == ConsensusSwarm.ConsensusCoordinator
+        # Consensus Swarm Coordinator creation
+        config["id"] = get(config, "id", agent_name)
+        config["consensus_agent_count"] = get(config, "consensus_agent_count", 5)
+        coordinator = ConsensusSwarm.setup_campaign(config)
+        CUSTOM_AGENTS[coordinator.coordinator_id] = coordinator
+        return HTTP.Response(201, JSON.json(Dict(
+            "id" => coordinator.coordinator_id,
+            "name" => agent_name,
+            "type" => agent_type_str,
+            "status" => "CREATED",
+            "created" => string(now()),
+            "updated" => string(now())
+        )))
     else
         @error "Unsupported custom agent type: $agent_type_str"
         return HTTP.Response(400, JSON.json(Dict("error" => "Unsupported custom agent type: $agent_type_str")))
@@ -368,5 +391,20 @@ function run_server(port=8053)
 end
 
 end # module JuliaOSV1Server
+
+# === Consensus Swarm Integration ===
+# To create a consensus swarm campaign, use:
+#
+# curl -X POST http://localhost:8053/api/v1/agents \
+#   -H "Content-Type: application/json" \
+#   -d '{
+#     "name": "consensus_campaign_001",
+#     "type": "CONSENSUSCOORDINATOR",
+#     "parameters": {
+#       "id": "consensus_campaign_001",
+#       "consensus_agent_count": 7
+#     }
+#   }'
+#
 
 JuliaOSV1Server.run_server()
