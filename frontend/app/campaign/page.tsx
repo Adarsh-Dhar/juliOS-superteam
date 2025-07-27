@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useConnection } from '@solana/wallet-adapter-react';
+import { useContract } from '@/hooks/useContract';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,7 +34,9 @@ import {
   Activity,
   TrendingUp,
   AlertCircle,
-  Info
+  Info,
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 
 interface CampaignForm {
@@ -64,6 +67,7 @@ interface CampaignForm {
 export default function CampaignPage() {
   const { publicKey, connected, signTransaction } = useWallet();
   const { connection } = useConnection();
+  const { mintNFT, loading: contractLoading, error: contractError, clearError } = useContract(connection);
   
   const [formData, setFormData] = useState<CampaignForm>({
     name: '',
@@ -88,6 +92,7 @@ export default function CampaignPage() {
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [nftSignature, setNftSignature] = useState<string | null>(null);
 
   const platforms = [
     { id: 'twitter', name: 'Twitter', icon: '🐦' },
@@ -172,9 +177,10 @@ export default function CampaignPage() {
   };
 
   const handleSubmit = async () => {
-    // Clear previous messages
     setSuccessMessage(null);
     setErrorMessage(null);
+    setNftSignature(null);
+    clearError();
 
     if (!formData.walletConnected) {
       setErrorMessage('Please connect your wallet first');
@@ -199,16 +205,12 @@ export default function CampaignPage() {
     setIsSubmitting(true);
     
     try {
-      // First, let's test if the API is reachable
-      console.log('Testing API connection...');
-      
-      // Create campaign data based on the schema
+      // Step 1: Create campaign
       const campaignData = {
         name: formData.name,
-        hashtag: formData.id, // Using the campaign ID as hashtag for uniqueness
+        hashtag: formData.id,
         description: `Campaign monitoring ${formData.platforms.join(', ')} for keywords: ${formData.keywords.join(', ')} and hashtags: ${formData.hashtags.join(', ')}`,
         startDate: new Date().toISOString(),
-        // Additional metadata for the campaign
         metadata: {
           platforms: formData.platforms,
           keywords: formData.keywords,
@@ -220,35 +222,46 @@ export default function CampaignPage() {
           budget: formData.budget,
           walletAddress: formData.walletAddress,
           juliaOSAccount: formData.juliaOSAccount,
-          // Don't include API key in metadata for security
         }
       };
 
-      console.log('Sending campaign data:', campaignData);
-
-      // Call the campaigns API to create the campaign
       const response = await fetch('/api/campaigns', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(campaignData),
       });
 
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Error response:', errorText);
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
 
       const createdCampaign = await response.json();
-      console.log('Created campaign:', createdCampaign);
       
-      // Show success message
-      setSuccessMessage(`Campaign "${createdCampaign.name}" created successfully! Campaign ID: ${createdCampaign.id}`);
+      // Step 2: Mint NFT for campaign access
+      if (connected && publicKey && signTransaction) {
+        const nftParams = {
+          campaignId: createdCampaign.id,
+          name: `${formData.name} Access Token`,
+          symbol: 'TGAP',
+          uri: `https://ipfs.io/ipfs/Qm${Date.now()}`,
+          agentCount: formData.crawlerCount + formData.analyzerCount,
+          payer: publicKey,
+          mintAuthority: publicKey,
+          signTransaction
+        };
+
+        const signature = await mintNFT(nftParams);
+        
+        if (signature) {
+          setNftSignature(signature);
+          setSuccessMessage(`Campaign "${createdCampaign.name}" created successfully! Campaign ID: ${createdCampaign.id}. NFT minted with signature: ${signature.slice(0, 8)}...${signature.slice(-8)}`);
+        } else {
+          setSuccessMessage(`Campaign "${createdCampaign.name}" created successfully! Campaign ID: ${createdCampaign.id}. NFT minting failed.`);
+        }
+      } else {
+        setSuccessMessage(`Campaign "${createdCampaign.name}" created successfully! Campaign ID: ${createdCampaign.id}. Please connect wallet to mint access NFT.`);
+      }
       
       // Reset form
       setFormData({
@@ -772,11 +785,25 @@ export default function CampaignPage() {
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-4 rounded-lg bg-green-500/20 border border-green-500/30"
+            className="p-6 rounded-lg bg-green-500/20 border border-green-500/30"
           >
-            <div className="flex items-center space-x-2">
-              <CheckCircle className="w-5 h-5 text-green-400" />
-              <span className="text-green-400 font-medium">{successMessage}</span>
+            <div className="flex items-start space-x-3">
+              <CheckCircle className="w-6 h-6 text-green-400 mt-1" />
+              <div className="flex-1">
+                <h3 className="text-green-400 font-semibold mb-2">Campaign Created Successfully!</h3>
+                <p className="text-green-300 text-sm mb-3">{successMessage}</p>
+                {nftSignature && (
+                  <div className="bg-green-500/10 rounded-lg p-3">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Sparkles className="w-4 h-4 text-green-400" />
+                      <span className="text-green-400 font-medium">Access NFT Minted</span>
+                    </div>
+                    <p className="text-xs text-green-300 font-mono">
+                      Signature: {nftSignature.slice(0, 20)}...{nftSignature.slice(-20)}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </motion.div>
         )}
@@ -790,6 +817,19 @@ export default function CampaignPage() {
             <div className="flex items-center space-x-2">
               <AlertCircle className="w-5 h-5 text-red-400" />
               <span className="text-red-400 font-medium">{errorMessage}</span>
+            </div>
+          </motion.div>
+        )}
+
+        {contractError && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 rounded-lg bg-orange-500/20 border border-orange-500/30"
+          >
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="w-5 h-5 text-orange-400" />
+              <span className="text-orange-400 font-medium">NFT Minting Error: {contractError}</span>
             </div>
           </motion.div>
         )}
@@ -820,10 +860,17 @@ export default function CampaignPage() {
             ) : (
               <Button
                 onClick={handleSubmit}
-                disabled={isSubmitting || !formData.walletConnected}
+                disabled={isSubmitting || !formData.walletConnected || contractLoading}
                 className="bg-gradient-to-r from-green-500 to-blue-500"
               >
-                {isSubmitting ? 'Creating Campaign...' : 'Create Campaign'}
+                {isSubmitting || contractLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>{isSubmitting ? 'Creating Campaign...' : 'Minting NFT...'}</span>
+                  </div>
+                ) : (
+                  'Create Campaign & Mint NFT'
+                )}
               </Button>
             )}
           </div>

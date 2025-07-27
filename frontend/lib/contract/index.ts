@@ -68,12 +68,12 @@ export const mintAccessNFT = async (
         mintAuthority: wallet.publicKey,
         mint: mintKP.publicKey,
         metadata: metadataPDA,
-        tokenAccount: tokenAccountPDA,
-        campaignData: campaignDataPDA,
+        token_account: tokenAccountPDA,
+        campaign_data: campaignDataPDA,
         tokenProgram: TOKEN_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
+        associated_token_program: ASSOCIATED_TOKEN_PROGRAM_ID,
+        token_metadata_program: TOKEN_METADATA_PROGRAM_ID,
+        system_program: SystemProgram.programId,
         rent: SYSVAR_RENT_PUBKEY,
       })
       .signers([mintKP])
@@ -107,8 +107,8 @@ export const verifyAccess = async (
       .verifyAccess(campaignId)
       .accounts({
         user: wallet.publicKey,
-        userTokenAccount: userTokenAccount,
-        campaignData: campaignDataPDA,
+        user_token_account: userTokenAccount,
+        campaign_data: campaignDataPDA,
       })
       .rpc();
 
