@@ -47,7 +47,13 @@ using .Reddit: RedditCrawler
 include("agents/crawlers/twitter.jl")
 using .Twitter: TwitterCrawler
 
+# Include analysis modules
+include("agents/analysis/sentiment.jl")
+
+include("agents/analysis/trend.jl")
+
 @info "AgentType fields: $(fieldnames(AgentType))"
+@info "Analysis modules loaded successfully"
 
 include("api/server/src/JuliaOSServer.jl")
 
@@ -82,6 +88,9 @@ const AGENT_STATUS_MAP = Dict(
 # Global registry for custom agent types
 const CUSTOM_AGENT_REGISTRY = Dict{String, Type}()
 
+# Global registry for created custom agents
+const CUSTOM_AGENTS = Dict{String, Any}()
+
 """
     register_custom_agent_type(name::String, agent_type::Type)
 
@@ -97,6 +106,15 @@ register_custom_agent_type("REDDITCRAWLER", RedditCrawler)
 # Register the Twitter crawler
 register_custom_agent_type("TWITTERCRAWLER", TwitterCrawler)
 
+# Register the analysis agents
+register_custom_agent_type("SENTIMENTANALYZER", SentimentAgent)
+
+register_custom_agent_type("TRENDANALYZER", TrendAgent)
+
+@info "Registered custom agents: $(keys(CUSTOM_AGENT_REGISTRY))"
+@info "SentimentAgent registered: $(haskey(CUSTOM_AGENT_REGISTRY, "SENTIMENTANALYZER"))"
+@info "TrendAgent registered: $(haskey(CUSTOM_AGENT_REGISTRY, "TRENDANALYZER"))"
+
 function create_agent(req::HTTP.Request)
     @info "Triggered endpoint: POST /agents"
     body = String(req.body)
@@ -105,9 +123,16 @@ function create_agent(req::HTTP.Request)
     agent_name = data["name"]
     agent_type_str = uppercase(data["type"])
     
+    @info "Requested agent type: $agent_type_str"
+    @info "Available custom agents: $(keys(CUSTOM_AGENT_REGISTRY))"
+    @info "Custom agent registry has key $agent_type_str: $(haskey(CUSTOM_AGENT_REGISTRY, agent_type_str))"
+    
     # Check if this is a custom agent type
     if haskey(CUSTOM_AGENT_REGISTRY, agent_type_str)
+        @info "Found custom agent type: $agent_type_str"
         return create_custom_agent(data, agent_type_str)
+    else
+        @info "Agent type $agent_type_str not found in custom registry, checking standard types"
     end
     
     # Handle standard agent types
@@ -143,8 +168,13 @@ function create_custom_agent(data::Dict, agent_type_str::String)
     agent_name = data["name"]
     agent_type_class = CUSTOM_AGENT_REGISTRY[agent_type_str]
     
+    @info "Creating custom agent: $agent_name of type $agent_type_str"
+    @info "Agent class: $agent_type_class"
+    
     # Extract configuration for the custom agent
     config = get(data, "parameters", Dict{String,Any}())
+    
+    @info "Agent config: $config"
     
     # Create the custom agent
     if agent_type_class == RedditCrawler
@@ -173,7 +203,58 @@ function create_custom_agent(data::Dict, agent_type_str::String)
             "created" => string(now()),
             "updated" => string(now())
         )))
+    elseif agent_type_class == SentimentAgent
+        @info "Creating SentimentAgent..."
+        try
+            agent = SentimentAgent(agent_name, config)
+            @info "Successfully created SentimentAgent with id: $(agent.id)"
+            
+            # Store the custom agent
+            CUSTOM_AGENTS[agent.id] = agent
+            @info "Stored agent in CUSTOM_AGENTS registry"
+            
+            @info "Created Sentiment analyzer agent: $(agent.id)"
+            
+            return HTTP.Response(201, JSON.json(Dict(
+                "id" => agent.id,
+                "name" => agent_name,
+                "type" => agent_type_str,
+                "status" => "CREATED",
+                "created" => string(now()),
+                "updated" => string(now())
+            )))
+        catch e
+            @error "Error creating SentimentAgent: $e"
+            @error "Stacktrace: $(stacktrace())"
+            return HTTP.Response(500, JSON.json(Dict("error" => "Failed to create SentimentAgent: $e")))
+        end
+    elseif agent_type_class == TrendAgent
+        @info "Creating TrendAgent..."
+        try
+            agent = TrendAgent(agent_name, config)
+            @info "Successfully created TrendAgent with id: $(agent.id)"
+            
+            # Store the custom agent
+            CUSTOM_AGENTS[agent.id] = agent
+            @info "Stored agent in CUSTOM_AGENTS registry"
+            
+            @info "Created Trend analyzer agent: $(agent.id)"
+            
+            return HTTP.Response(201, JSON.json(Dict(
+                "id" => agent.id,
+                "name" => agent_name,
+                "type" => agent_type_str,
+                "status" => "CREATED",
+                "created" => string(now()),
+                "updated" => string(now())
+            )))
+        catch e
+            @error "Error creating TrendAgent: $e"
+            @error "Stacktrace: $(stacktrace())"
+            return HTTP.Response(500, JSON.json(Dict("error" => "Failed to create TrendAgent: $e")))
+        end
     else
+        @error "Unsupported custom agent type: $agent_type_str"
         return HTTP.Response(400, JSON.json(Dict("error" => "Unsupported custom agent type: $agent_type_str")))
     end
 end
@@ -181,7 +262,8 @@ end
 function list_agents(req::HTTP.Request)
     @info "Triggered endpoint: GET /agents"
     agent_objs = Agents.listAgents()
-    # Map to API model: id, name, type, status, state (state = status as string, only CREATED, RUNNING, PAUSED, STOPPED allowed)
+    
+    # Map standard agents to API model
     api_agents = [Dict(
         "id" => ag.id,
         "name" => ag.name,
@@ -189,6 +271,22 @@ function list_agents(req::HTTP.Request)
         "status" => string(ag.status),
         "state" => string(ag.status) in ["CREATED","RUNNING","PAUSED","STOPPED"] ? string(ag.status) : "STOPPED"
     ) for ag in agent_objs]
+    
+    # Add custom agents to the list
+    for (id, agent) in CUSTOM_AGENTS
+        try
+            push!(api_agents, Dict(
+                "id" => get(agent, :id, id),
+                "name" => get(agent, :name, "Custom Agent"),
+                "type" => "CUSTOM",
+                "status" => "CREATED",
+                "state" => "CREATED"
+            ))
+        catch e
+            @warn "Error processing custom agent $id: $e"
+        end
+    end
+    
     return HTTP.Response(200, JSON.json(api_agents))
 end
 
