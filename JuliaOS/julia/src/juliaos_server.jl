@@ -148,7 +148,7 @@ function create_custom_agent(data::Dict, agent_type_str::String)
         
         return HTTP.Response(201, JSON.json(Dict(
             "id" => agent.id,
-            "name" => agent.name,
+            "name" => agent_name,  # Use the agent_name variable instead
             "type" => agent_type_str,
             "status" => "CREATED",
             "created" => string(now()),

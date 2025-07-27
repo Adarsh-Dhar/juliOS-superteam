@@ -72,7 +72,7 @@ function RedditCrawler(id::String, config::Dict)
     merged_config = merge(default_config, config)
     
     # Initialize state
-    new(
+    RedditCrawler(
         id,
         merged_config,
         creds,
