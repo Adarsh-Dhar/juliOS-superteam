@@ -2,7 +2,17 @@
 module Twitter
 
 using HTTP, JSON3, Dates, Base64, SHA, Random
-using JuliaOS.AgentFramework, JuliaOS.Vault, JuliaOS.IPFS, JuliaOS.ReputationKeeper
+
+# Import the required modules from the main server context
+# These modules are loaded by the server and available in the main context
+using ..Vault
+using ..ReputationKeeper
+using ..IPFS
+using ..SwarmComms
+
+# Import the required modules - these will be loaded by the server
+# For now, we'll define the AbstractAgent type locally
+abstract type AbstractAgent end
 
 const DEFAULT_USER_AGENTS = [
     "JuliaOS-Crawler/1.0 (Linux; U; Android 13; en-US)",
@@ -44,6 +54,7 @@ struct TwitterCrawler <: AbstractAgent
     user_agent::String
     backoff_until::DateTime
     next_token::String  # For pagination
+    error_count::Int  # Add error count field
 end
 
 function TwitterCrawler(id::String, config::Dict)
@@ -51,7 +62,8 @@ function TwitterCrawler(id::String, config::Dict)
     creds = Vault.get_secrets("twitter_api")
     
     # Initialize proxy pool
-    proxies = Vault.get_proxies("crawling", config["region"] ? config["region"] : "global")
+    region = get(config, "region", "global")
+    proxies = Vault.get_proxies("crawling", region)
     
     # Default configuration
     default_config = Dict(
@@ -71,7 +83,7 @@ function TwitterCrawler(id::String, config::Dict)
     merged_config = merge(default_config, config)
     
     # Initialize state
-    new(
+    TwitterCrawler(
         id,
         merged_config,
         creds["bearer_token"],
@@ -80,8 +92,24 @@ function TwitterCrawler(id::String, config::Dict)
         isempty(proxies) ? "" : rand(proxies),
         rand(DEFAULT_USER_AGENTS),
         now(),
-        ""  # Initial pagination token
+        "",  # Initial pagination token
+        0    # Initial error count
     )
+end
+
+# Add missing helper functions
+function error_count(agent::TwitterCrawler)
+    return agent.error_count
+end
+
+function compress(data::IOBuffer)
+    # Simple compression - in production, use proper compression
+    return take!(data)
+end
+
+function process_tweets(tweets::Vector{Tweet})
+    # Process tweets for analysis
+    return tweets
 end
 
 function run(agent::TwitterCrawler)
@@ -167,7 +195,7 @@ function scrape_twitter(agent::TwitterCrawler)
         # Parse response
         if response.status == 200
             data = JSON3.read(response.body)
-            new_tweets = parse_response(data)
+            new_tweets = parse_response(data, agent)
             append!(tweets, new_tweets)
             
             # Update pagination token
@@ -211,15 +239,19 @@ function build_query(agent::TwitterCrawler)
     end
     
     # Content filters
-    push!(query_parts, "-is:retweet") unless agent.config["include_retweets"]
-    push!(query_parts, "-is:reply") unless agent.config["include_replies"]
+    if !agent.config["include_retweets"]
+        push!(query_parts, "-is:retweet")
+    end
+    if !agent.config["include_replies"]
+        push!(query_parts, "-is:reply")
+    end
     push!(query_parts, "-is:nullcast")  # Always exclude nullcast
     
     # Combine query parts
     return join(query_parts, " ")
 end
 
-function parse_response(data::Dict)
+function parse_response(data::Dict, agent::TwitterCrawler)
     tweets = Tweet[]
     includes = get(data, "includes", Dict())
     users = get(includes, "users", Dict())
@@ -451,24 +483,4 @@ function is_active(agent::TwitterCrawler)
     return now() < end_time && agent.status != "terminated"
 end
 
-# Agent registration
-JuliaOS.register_agent_type(
-    "TwitterCrawler",
-    TwitterCrawler,
-    config_schema=Dict(
-        "keywords" => (Vector{String}, []),
-        "hashtags" => (Vector{String}, []),
-        "users" => (Vector{String}, []),
-        "languages" => (Vector{String}, ["en"]),
-        "scrape_interval" => (Int, 300),
-        "max_tweets" => (Int, 5000),
-        "include_retweets" => (Bool, false),
-        "include_replies" => (Bool, true),
-        "include_media" => (Bool, false),
-        "region" => (String, "global"),
-        "duration" => (Int, 86400)  # Default 24 hours
-    ),
-    required_secrets=["twitter_api"]
-)
-
-end
+end # module Twitter

@@ -44,6 +44,9 @@ using .SwarmComms
 include("agents/crawlers/reddit.jl")
 using .Reddit: RedditCrawler
 
+include("agents/crawlers/twitter.jl")
+using .Twitter: TwitterCrawler
+
 @info "AgentType fields: $(fieldnames(AgentType))"
 
 include("api/server/src/JuliaOSServer.jl")
@@ -90,6 +93,9 @@ end
 
 # Register the Reddit crawler
 register_custom_agent_type("REDDITCRAWLER", RedditCrawler)
+
+# Register the Twitter crawler
+register_custom_agent_type("TWITTERCRAWLER", TwitterCrawler)
 
 function create_agent(req::HTTP.Request)
     @info "Triggered endpoint: POST /agents"
@@ -161,7 +167,7 @@ function create_custom_agent(data::Dict, agent_type_str::String)
         
         return HTTP.Response(201, JSON.json(Dict(
             "id" => agent.id,
-            "name" => agent.name,
+            "name" => agent_name,  # Use the agent_name variable
             "type" => agent_type_str,
             "status" => "CREATED",
             "created" => string(now()),

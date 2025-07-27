@@ -1,7 +1,7 @@
 # Vault.jl
 module Vault
 
-using JSON, Base64, SHA, Random
+using JSON, Base64, SHA, Random, Dates
 
 # In-memory storage for secrets (in production, this should be encrypted)
 const SECRETS = Dict{String, Dict{String, Any}}()
@@ -15,14 +15,26 @@ Get secrets for a specific service.
 """
 function get_secrets(service::String)
     if !haskey(SECRETS, service)
-        # Return default Reddit API credentials (these should be set via environment variables)
-        SECRETS[service] = Dict{String, Any}(
-            "client_id" => get(ENV, "REDDIT_CLIENT_ID", ""),
-            "client_secret" => get(ENV, "REDDIT_CLIENT_SECRET", ""),
-            "access_token" => get(ENV, "REDDIT_ACCESS_TOKEN", ""),
-            "refresh_token" => get(ENV, "REDDIT_REFRESH_TOKEN", ""),
-            "expires_at" => now() + Hour(1)  # Default 1 hour expiry
-        )
+        if service == "twitter_api"
+            # Return default Twitter API credentials
+            SECRETS[service] = Dict{String, Any}(
+                "bearer_token" => get(ENV, "TWITTER_BEARER_TOKEN", ""),
+                "client_id" => get(ENV, "TWITTER_CLIENT_ID", ""),
+                "client_secret" => get(ENV, "TWITTER_CLIENT_SECRET", ""),
+                "access_token" => get(ENV, "TWITTER_ACCESS_TOKEN", ""),
+                "refresh_token" => get(ENV, "TWITTER_REFRESH_TOKEN", ""),
+                "expires_at" => now() + Hour(1)  # Default 1 hour expiry
+            )
+        else
+            # Return default Reddit API credentials
+            SECRETS[service] = Dict{String, Any}(
+                "client_id" => get(ENV, "REDDIT_CLIENT_ID", ""),
+                "client_secret" => get(ENV, "REDDIT_CLIENT_SECRET", ""),
+                "access_token" => get(ENV, "REDDIT_ACCESS_TOKEN", ""),
+                "refresh_token" => get(ENV, "REDDIT_REFRESH_TOKEN", ""),
+                "expires_at" => now() + Hour(1)  # Default 1 hour expiry
+            )
+        end
     end
     return SECRETS[service]
 end
