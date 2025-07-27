@@ -95,13 +95,14 @@ export const verifyAccess = async (
 ) => {
   const [campaignDataPDA] = findCampaignDataPDA(campaignId, program.programId);
   
-  // Get campaign data to find the mint
-  const campaignData = await program.account.campaignData.fetch(campaignDataPDA);
-  const mint = campaignData.mint;
-  
-  const userTokenAccount = await getAssociatedTokenAddressHelper(mint, wallet.publicKey);
-
   try {
+    // First, check if the campaign data account exists
+    const campaignData = await program.account.campaignData.fetch(campaignDataPDA);
+    const mint = campaignData.mint;
+    
+    const userTokenAccount = await getAssociatedTokenAddressHelper(mint, wallet.publicKey);
+
+    // Verify access using the contract method
     const tx = await program.methods
       .verifyAccess(campaignId)
       .accounts({
@@ -113,7 +114,13 @@ export const verifyAccess = async (
 
     console.log('Access verified successfully:', tx);
     return true;
-  } catch (error) {
+  } catch (error: any) {
+    // Handle specific error cases
+    if (error.message && error.message.includes('Account does not exist')) {
+      console.log(`Campaign data account doesn't exist for campaign: ${campaignId}`);
+      return false;
+    }
+    
     console.error('Access verification failed:', error);
     return false;
   }

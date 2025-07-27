@@ -1,494 +1,881 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { useConnection } from '@solana/wallet-adapter-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
-import { useCampaignNFT } from '@/hooks/useCampaignNFT';
-import NFTVerificationFlow from '@/components/NFTVerificationFlow';
-import AgentDeploymentVisual from '@/components/AgentDeploymentVisual';
-import CampaignCreationWizard from '@/components/CampaignCreationWizard';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
-  Activity, 
-  TrendingUp, 
-  AlertTriangle, 
-  CheckCircle, 
-  Clock, 
+  Wallet, 
+  Database, 
+  Server, 
   Zap,
-  BarChart3,
+  Globe,
+  Cpu,
+  Shield,
   Settings,
   Play,
-  Pause,
-  RotateCcw,
-  Eye,
-  Download,
-  Share2,
-  Shield,
-  Globe,
-  Cpu
+  BarChart3,
+  AlertTriangle,
+  CheckCircle,
+  DollarSign,
+  Key,
+  Users,
+  Target,
+  Activity,
+  TrendingUp,
+  AlertCircle,
+  Info
 } from 'lucide-react';
 
+interface CampaignForm {
+  // Campaign Configuration
+  name: string;
+  id: string;
+  platforms: string[];
+  keywords: string[];
+  hashtags: string[];
+  spamThreshold: number;
+  sentimentThreshold: number;
+  
+  // Resource Allocation
+  crawlerCount: number;
+  analyzerCount: number;
+  budget: number;
+  
+  // Wallet Essentials
+  walletConnected: boolean;
+  walletAddress: string;
+  solBalance: number;
+  
+  // JuliaOS Access
+  juliaOSAccount: string;
+  apiKey: string;
+}
+
 export default function CampaignPage() {
-  const { publicKey, connected } = useWallet();
-  const {
-    campaignNFT,
-    isLoading,
-    deploymentStatus,
-    agents,
-    metrics,
-    startCampaignFlow,
-    pauseAllAgents,
-    resumeAllAgents,
-    redeployAgents
-  } = useCampaignNFT();
+  const { publicKey, connected, signTransaction } = useWallet();
+  const { connection } = useConnection();
+  
+  const [formData, setFormData] = useState<CampaignForm>({
+    name: '',
+    id: '',
+    platforms: [],
+    keywords: [],
+    hashtags: [],
+    spamThreshold: 15,
+    sentimentThreshold: 30,
+    crawlerCount: 3,
+    analyzerCount: 2,
+    budget: 100,
+    walletConnected: false,
+    walletAddress: '',
+    solBalance: 0,
+    juliaOSAccount: '',
+    apiKey: ''
+  });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'online': return 'bg-green-500';
-      case 'initializing': return 'bg-yellow-500';
-      case 'pending': return 'bg-gray-500';
-      case 'offline': return 'bg-red-500';
-      default: return 'bg-gray-500';
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const platforms = [
+    { id: 'twitter', name: 'Twitter', icon: '🐦' },
+    { id: 'reddit', name: 'Reddit', icon: '🤖' },
+    { id: 'discord', name: 'Discord', icon: '💬' },
+    { id: 'telegram', name: 'Telegram', icon: '📱' },
+    { id: 'instagram', name: 'Instagram', icon: '📸' },
+    { id: 'youtube', name: 'YouTube', icon: '📺' }
+  ];
+
+  // Update wallet connection status when wallet connects/disconnects
+  useEffect(() => {
+    if (connected && publicKey) {
+      setFormData(prev => ({
+        ...prev,
+        walletConnected: true,
+        walletAddress: publicKey.toString()
+      }));
+      fetchWalletBalance();
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        walletConnected: false,
+        walletAddress: '',
+        solBalance: 0
+      }));
+    }
+  }, [connected, publicKey]);
+
+  const fetchWalletBalance = async () => {
+    if (!connection || !publicKey) return;
+    
+    setIsLoadingBalance(true);
+    try {
+      const balance = await connection.getBalance(publicKey);
+      const solBalance = balance / 1e9; // Convert lamports to SOL
+      setFormData(prev => ({
+        ...prev,
+        solBalance: solBalance
+      }));
+    } catch (error) {
+      console.error('Error fetching wallet balance:', error);
+    } finally {
+      setIsLoadingBalance(false);
     }
   };
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'online': return 'Online';
-      case 'initializing': return 'Initializing';
-      case 'pending': return 'Pending';
-      case 'offline': return 'Offline';
-      default: return 'Unknown';
+  const handlePlatformToggle = (platformId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      platforms: prev.platforms.includes(platformId)
+        ? prev.platforms.filter(p => p !== platformId)
+        : [...prev.platforms, platformId]
+    }));
+  };
+
+  const handleKeywordAdd = (keyword: string) => {
+    if (keyword && !formData.keywords.includes(keyword)) {
+      setFormData(prev => ({
+        ...prev,
+        keywords: [...prev.keywords, keyword]
+      }));
     }
   };
 
-  if (!connected) {
-    return (
-      <div className="min-h-screen bg-[#0A0F1F] flex items-center justify-center">
-        <Card className="w-full max-w-md glassmorphism border-purple-500/20">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-orbitron text-white">Campaign Access Required</CardTitle>
-            <CardDescription className="text-gray-400">
-              Connect your wallet to access your campaign dashboard
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            <WalletMultiButton />
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const handleHashtagAdd = (hashtag: string) => {
+    if (hashtag && !formData.hashtags.includes(hashtag)) {
+      setFormData(prev => ({
+        ...prev,
+        hashtags: [...prev.hashtags, hashtag]
+      }));
+    }
+  };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#0A0F1F] flex items-center justify-center">
-        <Card className="w-full max-w-lg glassmorphism border-purple-500/20">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-orbitron text-white mb-4">
-              {deploymentStatus === 'verifying' && 'Verifying NFT Access...'}
-              {deploymentStatus === 'initializing' && 'Initializing Campaign...'}
-              {deploymentStatus === 'deploying' && 'Deploying Agents...'}
-            </CardTitle>
-            <CardDescription className="text-gray-400">
-              {deploymentStatus === 'verifying' && 'Checking NFT ownership and metadata'}
-              {deploymentStatus === 'initializing' && 'Loading campaign configuration from IPFS'}
-              {deploymentStatus === 'deploying' && 'Deploying AI agents to decentralized network'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Progress value={
-              deploymentStatus === 'verifying' ? 25 :
-              deploymentStatus === 'initializing' ? 50 :
-              deploymentStatus === 'deploying' ? 75 : 100
-            } className="h-2" />
-            <div className="flex items-center justify-center space-x-2 text-sm text-gray-400">
-              <div className={`w-2 h-2 rounded-full ${deploymentStatus === 'verifying' ? 'bg-blue-500' : 'bg-gray-500'}`} />
-              <span>NFT Verification</span>
-              <div className={`w-2 h-2 rounded-full ${deploymentStatus === 'initializing' ? 'bg-blue-500' : 'bg-gray-500'}`} />
-              <span>Campaign Init</span>
-              <div className={`w-2 h-2 rounded-full ${deploymentStatus === 'deploying' ? 'bg-blue-500' : 'bg-gray-500'}`} />
-              <span>Agent Deploy</span>
+  const connectWallet = () => {
+    // The wallet connection is handled by the wallet adapter
+    // This function is now just for UI feedback
+    if (!connected) {
+      // Trigger wallet modal
+      // The actual connection is handled by the wallet adapter
+    }
+  };
+
+  const handleSubmit = async () => {
+    // Clear previous messages
+    setSuccessMessage(null);
+    setErrorMessage(null);
+
+    if (!formData.walletConnected) {
+      setErrorMessage('Please connect your wallet first');
+      return;
+    }
+
+    if (!formData.name || !formData.id) {
+      setErrorMessage('Please fill in campaign name and ID');
+      return;
+    }
+
+    if (formData.platforms.length === 0) {
+      setErrorMessage('Please select at least one platform to monitor');
+      return;
+    }
+
+    if (formData.keywords.length === 0 && formData.hashtags.length === 0) {
+      setErrorMessage('Please add at least one keyword or hashtag to monitor');
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      // First, let's test if the API is reachable
+      console.log('Testing API connection...');
+      
+      // Create campaign data based on the schema
+      const campaignData = {
+        name: formData.name,
+        hashtag: formData.id, // Using the campaign ID as hashtag for uniqueness
+        description: `Campaign monitoring ${formData.platforms.join(', ')} for keywords: ${formData.keywords.join(', ')} and hashtags: ${formData.hashtags.join(', ')}`,
+        startDate: new Date().toISOString(),
+        // Additional metadata for the campaign
+        metadata: {
+          platforms: formData.platforms,
+          keywords: formData.keywords,
+          hashtags: formData.hashtags,
+          spamThreshold: formData.spamThreshold,
+          sentimentThreshold: formData.sentimentThreshold,
+          crawlerCount: formData.crawlerCount,
+          analyzerCount: formData.analyzerCount,
+          budget: formData.budget,
+          walletAddress: formData.walletAddress,
+          juliaOSAccount: formData.juliaOSAccount,
+          // Don't include API key in metadata for security
+        }
+      };
+
+      console.log('Sending campaign data:', campaignData);
+
+      // Call the campaigns API to create the campaign
+      const response = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(campaignData),
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const createdCampaign = await response.json();
+      console.log('Created campaign:', createdCampaign);
+      
+      // Show success message
+      setSuccessMessage(`Campaign "${createdCampaign.name}" created successfully! Campaign ID: ${createdCampaign.id}`);
+      
+      // Reset form
+      setFormData({
+        name: '',
+        id: '',
+        platforms: [],
+        keywords: [],
+        hashtags: [],
+        spamThreshold: 15,
+        sentimentThreshold: 30,
+        crawlerCount: 3,
+        analyzerCount: 2,
+        budget: 100,
+        walletConnected: formData.walletConnected,
+        walletAddress: formData.walletAddress,
+        solBalance: formData.solBalance,
+        juliaOSAccount: '',
+        apiKey: ''
+      });
+      
+      setCurrentStep(0);
+      
+    } catch (error) {
+      console.error('Error creating campaign:', error);
+      setErrorMessage(`Failed to create campaign: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const clearMessages = () => {
+    setSuccessMessage(null);
+    setErrorMessage(null);
+  };
+
+  const handleNextStep = () => {
+    clearMessages();
+    setCurrentStep(prev => prev + 1);
+  };
+
+  const handlePreviousStep = () => {
+    clearMessages();
+    setCurrentStep(prev => Math.max(0, prev - 1));
+  };
+
+  const steps = [
+    { id: 'config', title: 'Campaign Configuration', icon: Settings },
+    { id: 'resources', title: 'Resource Allocation', icon: Cpu },
+    { id: 'wallet', title: 'Wallet Setup', icon: Wallet },
+    { id: 'juliaos', title: 'JuliaOS Access', icon: Key }
+  ];
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 0:
+        return (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="space-y-6"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <Label htmlFor="name">Campaign Name</Label>
+                <Input
+                  id="name"
+                  placeholder="e.g., Medterra Summer Launch"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                />
+              </div>
+              
+              <div className="space-y-4">
+                <Label htmlFor="id">Campaign ID</Label>
+                <Input
+                  id="id"
+                  placeholder="e.g., medterra_summer_launch"
+                  value={formData.id}
+                  onChange={(e) => setFormData(prev => ({ ...prev, id: e.target.value }))}
+                />
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
-  return (
-    <div className="min-h-screen bg-[#0A0F1F] text-white">
-      {/* Header */}
-      <motion.header
-        className="border-b border-gray-800/50 bg-black/20 backdrop-blur-sm"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-orbitron font-bold holographic-text">
-                Campaign Dashboard
-              </h1>
-              <Badge variant="secondary" className="bg-green-500/20 text-green-400 border-green-500/30">
-                <CheckCircle className="w-3 h-3 mr-1" />
-                Active
-              </Badge>
+            <div className="space-y-4">
+              <Label>Platforms to Monitor</Label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {platforms.map((platform) => (
+                  <motion.button
+                    key={platform.id}
+                    type="button"
+                    className={`p-3 rounded-lg border-2 transition-all duration-200 flex items-center space-x-2 ${
+                      formData.platforms.includes(platform.id)
+                        ? 'border-purple-500 bg-purple-500/20'
+                        : 'border-gray-600 bg-gray-800/50 hover:border-gray-500'
+                    }`}
+                    onClick={() => handlePlatformToggle(platform.id)}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <span className="text-lg">{platform.icon}</span>
+                    <span className="text-sm font-medium">{platform.name}</span>
+                  </motion.button>
+                ))}
+              </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <WalletMultiButton />
-            </div>
-          </div>
-        </div>
-      </motion.header>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-8">
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="wizard">Creation Wizard</TabsTrigger>
-            <TabsTrigger value="verification">NFT Verification</TabsTrigger>
-            <TabsTrigger value="deployment">Agent Deployment</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          </TabsList>
-
-          {/* Dashboard Tab */}
-          <TabsContent value="dashboard" className="space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Left Column - Campaign Info & Controls */}
-              <div className="lg:col-span-1 space-y-6">
-                {/* Campaign NFT Info */}
-                <Card className="glassmorphism border-purple-500/20">
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <Activity className="w-5 h-5 text-purple-400" />
-                      <span>Campaign NFT</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Name:</span>
-                        <span className="font-semibold">{campaignNFT?.metadata.name}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Symbol:</span>
-                        <span className="font-semibold">{campaignNFT?.symbol}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Address:</span>
-                        <span className="text-xs font-mono text-gray-300">
-                          {campaignNFT?.address.slice(0, 8)}...{campaignNFT?.address.slice(-8)}
-                        </span>
-                      </div>
-                    </div>
-                    <Separator />
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Platforms:</span>
-                        <div className="flex space-x-1">
-                          {campaignNFT?.metadata.platforms.map(platform => (
-                            <Badge key={platform} variant="outline" className="text-xs">
-                              {platform}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Keywords:</span>
-                        <div className="flex space-x-1">
-                          {campaignNFT?.metadata.keywords.map(keyword => (
-                            <Badge key={keyword} variant="outline" className="text-xs">
-                              {keyword}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Agent Status */}
-                <Card className="glassmorphism border-purple-500/20">
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <Zap className="w-5 h-5 text-blue-400" />
-                      <span>Agent Status</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {agents.map(agent => (
-                        <div key={agent.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-800/30">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-3 h-3 rounded-full ${getStatusColor(agent.status)}`} />
-                            <div>
-                              <div className="font-medium text-sm">
-                                {agent.type.charAt(0).toUpperCase() + agent.type.slice(1)} Agent
-                              </div>
-                              {agent.platform && (
-                                <div className="text-xs text-gray-400">{agent.platform}</div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-medium">{getStatusText(agent.status)}</div>
-                            {agent.performance > 0 && (
-                              <div className="text-xs text-gray-400">{agent.performance}%</div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Control Panel */}
-                <Card className="glassmorphism border-purple-500/20">
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <Settings className="w-5 h-5 text-green-400" />
-                      <span>Control Panel</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <Button 
-                      className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-blue-500 hover:to-purple-500"
-                      onClick={resumeAllAgents}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <Label>Target Keywords</Label>
+                <div className="space-y-2">
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Add keyword..."
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleKeywordAdd(e.currentTarget.value);
+                          e.currentTarget.value = '';
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={(e) => {
+                        const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                        handleKeywordAdd(input.value);
+                        input.value = '';
+                      }}
                     >
-                      <Play className="w-4 h-4 mr-2" />
-                      Resume All Agents
+                      Add
                     </Button>
-                    <Button variant="outline" className="w-full" onClick={pauseAllAgents}>
-                      <Pause className="w-4 h-4 mr-2" />
-                      Pause All Agents
-                    </Button>
-                    <Button variant="outline" className="w-full" onClick={redeployAgents}>
-                      <RotateCcw className="w-4 h-4 mr-2" />
-                      Redeploy Agents
-                    </Button>
-                    <Separator />
-                    <Button variant="outline" className="w-full">
-                      <Eye className="w-4 h-4 mr-2" />
-                      View Raw Data
-                    </Button>
-                    <Button variant="outline" className="w-full">
-                      <Download className="w-4 h-4 mr-2" />
-                      Export Report
-                    </Button>
-                    <Button variant="outline" className="w-full">
-                      <Share2 className="w-4 h-4 mr-2" />
-                      Share Dashboard
-                    </Button>
-                  </CardContent>
-                </Card>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {formData.keywords.map((keyword, index) => (
+                      <Badge key={index} variant="secondary" className="bg-blue-500/20 text-blue-400">
+                        {keyword}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
               </div>
 
-              {/* Right Column - Analytics & Metrics */}
-              <div className="lg:col-span-2 space-y-6">
-                {/* Real-time Metrics */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Card className="glassmorphism border-green-500/20">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-400">Posts Analyzed</p>
-                          <p className="text-2xl font-bold text-white">{metrics.postsAnalyzed.toLocaleString()}</p>
-                        </div>
-                        <TrendingUp className="w-8 h-8 text-green-400" />
-                      </div>
-                      <div className="mt-2 flex items-center text-sm">
-                        <span className="text-green-400">↑ 12%</span>
-                        <span className="text-gray-400 ml-1">from last hour</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="glassmorphism border-blue-500/20">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-400">Avg. Sentiment</p>
-                          <p className="text-2xl font-bold text-white">{(metrics.avgSentiment * 100).toFixed(1)}%</p>
-                        </div>
-                        <BarChart3 className="w-8 h-8 text-blue-400" />
-                      </div>
-                      <div className="mt-2 flex items-center text-sm">
-                        <span className={metrics.sentimentTrend === 'up' ? 'text-green-400' : metrics.sentimentTrend === 'down' ? 'text-red-400' : 'text-gray-400'}>
-                          {metrics.sentimentTrend === 'up' ? '↑' : metrics.sentimentTrend === 'down' ? '↓' : '→'} Stable
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="glassmorphism border-red-500/20">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-gray-400">Spam Detected</p>
-                          <p className="text-2xl font-bold text-white">{metrics.spamDetected.toFixed(1)}%</p>
-                        </div>
-                        <AlertTriangle className="w-8 h-8 text-red-400" />
-                      </div>
-                      <div className="mt-2 flex items-center text-sm">
-                        <span className="text-red-400">↓ 2%</span>
-                        <span className="text-gray-400 ml-1">from last hour</span>
-                      </div>
-                    </CardContent>
-                  </Card>
+              <div className="space-y-4">
+                <Label>Target Hashtags</Label>
+                <div className="space-y-2">
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Add hashtag..."
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleHashtagAdd(e.currentTarget.value);
+                          e.currentTarget.value = '';
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={(e) => {
+                        const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                        handleHashtagAdd(input.value);
+                        input.value = '';
+                      }}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {formData.hashtags.map((hashtag, index) => (
+                      <Badge key={index} variant="secondary" className="bg-green-500/20 text-green-400">
+                        {hashtag}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-
-                {/* Agent Deployment Chart */}
-                <Card className="glassmorphism border-purple-500/20">
-                  <CardHeader>
-                    <CardTitle className="flex items-center space-x-2">
-                      <Zap className="w-5 h-5 text-yellow-400" />
-                      <span>Agent Deployment Status</span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="text-center p-4 rounded-lg bg-green-500/10 border border-green-500/20">
-                        <div className="text-2xl font-bold text-green-400">
-                          {agents.filter(a => a.status === 'online').length}
-                        </div>
-                        <div className="text-sm text-gray-400">Online</div>
-                      </div>
-                      <div className="text-center p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                        <div className="text-2xl font-bold text-yellow-400">
-                          {agents.filter(a => a.status === 'initializing').length}
-                        </div>
-                        <div className="text-sm text-gray-400">Initializing</div>
-                      </div>
-                      <div className="text-center p-4 rounded-lg bg-gray-500/10 border border-gray-500/20">
-                        <div className="text-2xl font-bold text-gray-400">
-                          {agents.filter(a => a.status === 'pending').length}
-                        </div>
-                        <div className="text-sm text-gray-400">Pending</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
               </div>
             </div>
-          </TabsContent>
 
-          {/* Creation Wizard Tab */}
-          <TabsContent value="wizard" className="space-y-8">
-            <CampaignCreationWizard />
-          </TabsContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <Label>Spam Alert Threshold: {formData.spamThreshold}%</Label>
+                <Slider
+                  value={[formData.spamThreshold]}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, spamThreshold: value[0] }))}
+                  max={50}
+                  min={5}
+                  step={5}
+                  className="w-full"
+                />
+              </div>
 
-          {/* NFT Verification Tab */}
-          <TabsContent value="verification" className="space-y-8">
-            <NFTVerificationFlow />
-          </TabsContent>
+              <div className="space-y-4">
+                <Label>Sentiment Drop Threshold: {formData.sentimentThreshold}%</Label>
+                <Slider
+                  value={[formData.sentimentThreshold]}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, sentimentThreshold: value[0] }))}
+                  max={50}
+                  min={10}
+                  step={5}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          </motion.div>
+        );
 
-          {/* Agent Deployment Tab */}
-          <TabsContent value="deployment" className="space-y-8">
-            <AgentDeploymentVisual />
-          </TabsContent>
+      case 1:
+        return (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="space-y-6"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card className="glassmorphism border-blue-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Cpu className="w-5 h-5 text-blue-400" />
+                    <span>Agent Deployment</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Crawler Agents: {formData.crawlerCount}</Label>
+                    <Slider
+                      value={[formData.crawlerCount]}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, crawlerCount: value[0] }))}
+                      max={10}
+                      min={1}
+                      step={1}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-gray-400">Data collection agents for each platform</p>
+                  </div>
 
-          {/* Analytics Tab */}
-          <TabsContent value="analytics" className="space-y-8">
+                  <div className="space-y-4">
+                    <Label>Analyzer Agents: {formData.analyzerCount}</Label>
+                    <Slider
+                      value={[formData.analyzerCount]}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, analyzerCount: value[0] }))}
+                      max={5}
+                      min={1}
+                      step={1}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-gray-400">Sentiment and content analysis agents</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="glassmorphism border-green-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <DollarSign className="w-5 h-5 text-green-400" />
+                    <span>Budget Allocation</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-4">
+                    <Label>Monthly Budget: ${formData.budget}</Label>
+                    <Slider
+                      value={[formData.budget]}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, budget: value[0] }))}
+                      max={1000}
+                      min={50}
+                      step={50}
+                      className="w-full"
+                    />
+                    <p className="text-xs text-gray-400">Covers gas fees and LLM costs</p>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Gas Fees:</span>
+                      <span className="text-blue-400">~${formData.budget * 0.3}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">LLM Costs:</span>
+                      <span className="text-green-400">~${formData.budget * 0.7}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Total Agents:</span>
+                      <span className="text-white">{formData.crawlerCount + formData.analyzerCount}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </motion.div>
+        );
+
+      case 2:
+        return (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="space-y-6"
+          >
             <Card className="glassmorphism border-purple-500/20">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <BarChart3 className="w-5 h-5 text-purple-400" />
-                  <span>Real-time Analytics</span>
+                  <Wallet className="w-5 h-5 text-purple-400" />
+                  <span>Wallet Essentials</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="overview" className="w-full">
-                  <TabsList className="grid w-full grid-cols-4">
-                    <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="sentiment">Sentiment</TabsTrigger>
-                    <TabsTrigger value="platforms">Platforms</TabsTrigger>
-                    <TabsTrigger value="alerts">Alerts</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="overview" className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <h4 className="font-semibold">Performance Metrics</h4>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span>Accuracy Rate:</span>
-                            <span className="text-green-400">98.7%</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Response Time:</span>
-                            <span className="text-blue-400">2.3s</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Uptime:</span>
-                            <span className="text-green-400">99.9%</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <h4 className="font-semibold">Alert Thresholds</h4>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between">
-                            <span>Spam Threshold:</span>
-                            <span>{campaignNFT?.metadata.alert_thresholds.spam}%</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Sentiment Drop:</span>
-                            <span>{campaignNFT?.metadata.alert_thresholds.sentiment_drop}%</span>
-                          </div>
-                        </div>
-                      </div>
+              <CardContent className="space-y-6">
+                {!formData.walletConnected ? (
+                  <div className="text-center space-y-4">
+                    <div className="w-16 h-16 mx-auto bg-purple-500/20 rounded-full flex items-center justify-center">
+                      <Wallet className="w-8 h-8 text-purple-400" />
                     </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="sentiment" className="space-y-4">
-                    <div className="h-32 bg-gray-800/30 rounded-lg flex items-center justify-center">
-                      <span className="text-gray-400">Sentiment Analysis Chart</span>
+                    <div>
+                      <h3 className="text-lg font-semibold mb-2">Connect Your Wallet</h3>
+                      <p className="text-gray-400 mb-4">
+                        Connect your Solana wallet to mint campaign NFTs and manage operations
+                      </p>
                     </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="platforms" className="space-y-4">
+                    <Button onClick={connectWallet} className="bg-gradient-to-r from-purple-500 to-blue-500">
+                      <Wallet className="w-4 h-4 mr-2" />
+                      Connect Wallet
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2 text-green-400">
+                      <CheckCircle className="w-5 h-5" />
+                      <span className="font-medium">Wallet Connected</span>
+                    </div>
+                    
                     <div className="space-y-3">
-                      {campaignNFT?.metadata.platforms.map(platform => (
-                        <div key={platform} className="flex items-center justify-between p-3 rounded-lg bg-gray-800/30">
-                          <span className="capitalize">{platform}</span>
-                          <div className="flex items-center space-x-2">
-                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                            <span className="text-sm text-green-400">Active</span>
-                          </div>
-                        </div>
-                      ))}
+                      <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                        <span className="text-gray-400">Address:</span>
+                        <span className="text-sm font-mono text-white">
+                          {formData.walletAddress.slice(0, 8)}...{formData.walletAddress.slice(-8)}
+                        </span>
+                      </div>
+                      
+                      <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
+                        <span className="text-gray-400">SOL Balance:</span>
+                        <span className="text-green-400 font-medium">
+                          {isLoadingBalance ? (
+                            <span className="flex items-center space-x-2">
+                              <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin"></div>
+                              <span>Loading...</span>
+                            </span>
+                          ) : (
+                            `${formData.solBalance.toFixed(4)} SOL`
+                          )}
+                        </span>
+                      </div>
                     </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="alerts" className="space-y-4">
-                    <Alert>
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>
-                        Sentiment drop detected on Twitter - 25% decrease in positive mentions
-                      </AlertDescription>
-                    </Alert>
-                    <Alert>
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>
-                        Spam activity increased to 12% on Reddit
-                      </AlertDescription>
-                    </Alert>
-                  </TabsContent>
-                </Tabs>
+
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-white">Required for Campaign:</h4>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between p-2 bg-blue-500/10 rounded">
+                          <span className="text-sm">NFT Minting Cost:</span>
+                          <span className="text-blue-400">~0.0018 SOL</span>
+                        </div>
+                        <div className="flex items-center justify-between p-2 bg-green-500/10 rounded">
+                          <span className="text-sm">Available Balance:</span>
+                          <span className="text-green-400">{formData.solBalance.toFixed(4)} SOL</span>
+                        </div>
+                        {formData.solBalance < 0.002 && (
+                          <div className="flex items-center justify-between p-2 bg-red-500/10 rounded">
+                            <span className="text-sm text-red-400">Insufficient Balance</span>
+                            <span className="text-red-400">Need at least 0.002 SOL</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
+          </motion.div>
+        );
+
+      case 3:
+        return (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="space-y-6"
+          >
+            <Card className="glassmorphism border-orange-500/20">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Key className="w-5 h-5 text-orange-400" />
+                  <span>JuliaOS Access</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <Label htmlFor="juliaOSAccount">JuliaOS Account</Label>
+                    <Input
+                      id="juliaOSAccount"
+                      placeholder="your-account@juliaos.com"
+                      value={formData.juliaOSAccount}
+                      onChange={(e) => setFormData(prev => ({ ...prev, juliaOSAccount: e.target.value }))}
+                    />
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <Label htmlFor="apiKey">API Key</Label>
+                    <Input
+                      id="apiKey"
+                      type="password"
+                      placeholder="Enter your JuliaOS API key"
+                      value={formData.apiKey}
+                      onChange={(e) => setFormData(prev => ({ ...prev, apiKey: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-white">Access Requirements:</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2 text-sm">
+                      <CheckCircle className="w-4 h-4 text-green-400" />
+                      <span className="text-gray-300">Account on JuliaOS platform</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm">
+                      <CheckCircle className="w-4 h-4 text-green-400" />
+                      <span className="text-gray-300">API keys for agent deployment</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-sm">
+                      <CheckCircle className="w-4 h-4 text-green-400" />
+                      <span className="text-gray-300">Access to decentralized agent network</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  const isStepValid = (step: number) => {
+    switch (step) {
+      case 0: // Campaign Configuration
+        return formData.name && formData.id && formData.platforms.length > 0 && 
+               (formData.keywords.length > 0 || formData.hashtags.length > 0);
+      case 1: // Resource Allocation
+        return formData.crawlerCount > 0 && formData.analyzerCount > 0 && formData.budget > 0;
+      case 2: // Wallet Setup
+        return formData.walletConnected && formData.solBalance >= 0.002;
+      case 3: // JuliaOS Access
+        return formData.juliaOSAccount && formData.apiKey;
+      default:
+        return false;
+    }
+  };
+
+  const canProceedToNextStep = () => {
+    return isStepValid(currentStep);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#0A0F1F] via-[#1A1F2F] to-[#0A0F1F] p-6">
+      <div className="max-w-6xl mx-auto space-y-8">
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <motion.h1 
+            className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            Create Campaign
+          </motion.h1>
+          <motion.p 
+            className="text-gray-400 text-lg max-w-2xl mx-auto"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            Configure your decentralized content monitoring campaign with AI agents
+          </motion.p>
+        </div>
+
+        {/* Progress Steps */}
+        <div className="flex justify-center">
+          <div className="flex space-x-4">
+            {steps.map((step, index) => (
+              <motion.div
+                key={step.id}
+                className={`flex items-center space-x-2 ${
+                  index <= currentStep ? 'text-white' : 'text-gray-500'
+                }`}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
+                  index <= currentStep 
+                    ? 'border-purple-500 bg-purple-500/20' 
+                    : 'border-gray-600 bg-gray-800/50'
+                }`}>
+                  <step.icon className="w-4 h-4" />
+                </div>
+                <span className="hidden md:block text-sm font-medium">{step.title}</span>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        {/* Main Form */}
+        <Card className="glassmorphism border-purple-500/20">
+          <CardContent className="p-8">
+            {renderStep()}
+          </CardContent>
+        </Card>
+
+        {/* Success/Error Messages */}
+        {successMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 rounded-lg bg-green-500/20 border border-green-500/30"
+          >
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="w-5 h-5 text-green-400" />
+              <span className="text-green-400 font-medium">{successMessage}</span>
+            </div>
+          </motion.div>
+        )}
+
+        {errorMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 rounded-lg bg-red-500/20 border border-red-500/30"
+          >
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="w-5 h-5 text-red-400" />
+              <span className="text-red-400 font-medium">{errorMessage}</span>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Navigation */}
+        <div className="flex justify-between items-center">
+          <Button
+            variant="outline"
+            onClick={handlePreviousStep}
+            disabled={currentStep === 0}
+          >
+            Previous
+          </Button>
+
+          <div className="flex space-x-4">
+            {currentStep < steps.length - 1 ? (
+              <Button
+                onClick={handleNextStep}
+                disabled={!canProceedToNextStep()}
+                className={`${
+                  canProceedToNextStep() 
+                    ? 'bg-gradient-to-r from-purple-500 to-blue-500' 
+                    : 'bg-gray-600 cursor-not-allowed'
+                }`}
+              >
+                Next Step
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting || !formData.walletConnected}
+                className="bg-gradient-to-r from-green-500 to-blue-500"
+              >
+                {isSubmitting ? 'Creating Campaign...' : 'Create Campaign'}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Requirements Summary */}
+        <Card className="glassmorphism border-blue-500/20">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Info className="w-5 h-5 text-blue-400" />
+              <span>Campaign Requirements Summary</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <h4 className="font-semibold text-white">Campaign Configuration</h4>
+                <ul className="text-sm text-gray-400 space-y-1">
+                  <li>• Name/ID (medterra_summer_launch)</li>
+                  <li>• Platforms to monitor</li>
+                  <li>• Target keywords/hashtags</li>
+                  <li>• Alert thresholds</li>
+                </ul>
+              </div>
+              
+              <div className="space-y-2">
+                <h4 className="font-semibold text-white">Resource Allocation</h4>
+                <ul className="text-sm text-gray-400 space-y-1">
+                  <li>• Agent types/count</li>
+                  <li>• Budget for operations</li>
+                  <li>• Gas + LLM costs</li>
+                </ul>
+              </div>
+              
+              <div className="space-y-2">
+                <h4 className="font-semibold text-white">Wallet Essentials</h4>
+                <ul className="text-sm text-gray-400 space-y-1">
+                  <li>• SOL for NFT minting (~0.0018 SOL)</li>
+                  <li>• Connected Web3 wallet</li>
+                </ul>
+              </div>
+              
+              <div className="space-y-2">
+                <h4 className="font-semibold text-white">JuliaOS Access</h4>
+                <ul className="text-sm text-gray-400 space-y-1">
+                  <li>• Account on JuliaOS platform</li>
+                  <li>• API keys for agent deployment</li>
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

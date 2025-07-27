@@ -78,12 +78,25 @@ pub mod access_nft {
 
         // Store campaign data on-chain
         let campaign_data = &mut ctx.accounts.campaign_data;
-        campaign_data.id = campaign_id;
+        campaign_data.id = campaign_id.clone();
         campaign_data.mint = ctx.accounts.mint.key();
         campaign_data.uri = uri;
         campaign_data.agent_count = agent_count;
         campaign_data.created_at = Clock::get()?.unix_timestamp;
         campaign_data.bump = ctx.bumps.campaign_data;
+
+        // Update creator campaigns tracking
+        let creator_campaigns = &mut ctx.accounts.creator_campaigns;
+        if creator_campaigns.creator == Pubkey::default() {
+            // First campaign for this creator
+            creator_campaigns.creator = ctx.accounts.mint_authority.key();
+            creator_campaigns.first_campaign_id = campaign_id.clone();
+            creator_campaigns.created_at = Clock::get()?.unix_timestamp;
+            creator_campaigns.bump = ctx.bumps.creator_campaigns;
+        }
+        creator_campaigns.campaign_count += 1;
+        creator_campaigns.total_nfts_created += agent_count;
+        creator_campaigns.last_campaign_id = campaign_id;
 
         msg!("Access NFT minted successfully for campaign: {}", campaign_data.id);
         Ok(())
@@ -138,6 +151,46 @@ pub mod access_nft {
         msg!("URI: {}", campaign_data.uri);
         msg!("Agent Count: {}", campaign_data.agent_count);
         msg!("Created At: {}", campaign_data.created_at);
+        
+        Ok(())
+    }
+
+    /// Get all access NFTs created by a specific creator
+    /// This function returns information about all campaigns created by the given creator
+    pub fn get_creator_campaigns(
+        ctx: Context<GetCreatorCampaigns>,
+        _creator: Pubkey,
+    ) -> Result<()> {
+        let creator_campaigns = &ctx.accounts.creator_campaigns;
+        
+        msg!("Creator: {}", _creator);
+        msg!("Total Campaigns: {}", creator_campaigns.campaign_count);
+        msg!("Total NFTs Created: {}", creator_campaigns.total_nfts_created);
+        msg!("First Campaign: {}", creator_campaigns.first_campaign_id);
+        msg!("Last Campaign: {}", creator_campaigns.last_campaign_id);
+        msg!("Created At: {}", creator_campaigns.created_at);
+        
+        Ok(())
+    }
+
+    /// Get detailed campaign information for a specific creator
+    /// This function returns detailed information about campaigns created by the given creator
+    pub fn get_creator_campaign_details(
+        ctx: Context<GetCreatorCampaignDetails>,
+        creator: Pubkey,
+        campaign_id: String,
+    ) -> Result<()> {
+        let campaign_data = &ctx.accounts.campaign_data;
+        let creator_campaigns = &ctx.accounts.creator_campaigns;
+        
+        msg!("Creator: {}", creator);
+        msg!("Campaign ID: {}", campaign_data.id);
+        msg!("Campaign Mint: {}", campaign_data.mint);
+        msg!("Campaign URI: {}", campaign_data.uri);
+        msg!("Agent Count: {}", campaign_data.agent_count);
+        msg!("Campaign Created At: {}", campaign_data.created_at);
+        msg!("Creator Total Campaigns: {}", creator_campaigns.campaign_count);
+        msg!("Creator Total NFTs: {}", creator_campaigns.total_nfts_created);
         
         Ok(())
     }
@@ -198,6 +251,16 @@ pub struct MintAccessNFT<'info> {
         bump
     )]
     pub campaign_data: Account<'info, CampaignData>,
+    
+    /// Creator campaigns tracking PDA
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = CreatorCampaigns::LEN,
+        seeds = [b"creator_campaigns", mint_authority.key().as_ref()],
+        bump
+    )]
+    pub creator_campaigns: Account<'info, CreatorCampaigns>,
     
     /// Required programs
     pub token_program: Program<'info, Token>,
@@ -262,6 +325,41 @@ pub struct GetCampaignInfo<'info> {
     pub campaign_data: Account<'info, CampaignData>,
 }
 
+#[derive(Accounts)]
+#[instruction(creator: Pubkey)]
+pub struct GetCreatorCampaigns<'info> {
+    /// The creator whose campaigns are being queried
+    pub creator: Signer<'info>,
+    
+    /// Campaign data PDA
+    #[account(
+        seeds = [b"creator_campaigns", creator.key().as_ref()],
+        bump = creator_campaigns.bump,
+    )]
+    pub creator_campaigns: Account<'info, CreatorCampaigns>,
+}
+
+#[derive(Accounts)]
+#[instruction(creator: Pubkey, _campaign_id: String)]
+pub struct GetCreatorCampaignDetails<'info> {
+    /// The creator whose campaigns are being queried
+    pub creator: Signer<'info>,
+    
+    /// Campaign data PDA
+    #[account(
+        seeds = [b"campaign", _campaign_id.as_bytes()],
+        bump = campaign_data.bump,
+    )]
+    pub campaign_data: Account<'info, CampaignData>,
+    
+    /// Creator campaigns tracking PDA
+    #[account(
+        seeds = [b"creator_campaigns", creator.key().as_ref()],
+        bump = creator_campaigns.bump,
+    )]
+    pub creator_campaigns: Account<'info, CreatorCampaigns>,
+}
+
 // ========== DATA STRUCTURES ==========
 
 #[account]
@@ -286,6 +384,35 @@ impl CampaignData {
         32 +                  // mint (Pubkey)
         4 + 200 +             // uri (String)
         4 +                   // agent_count (u32)
+        8 +                   // created_at (i64)
+        1;                    // bump (u8)
+}
+
+#[account]
+pub struct CreatorCampaigns {
+    /// The creator whose campaigns are being tracked
+    pub creator: Pubkey,
+    /// Total number of campaigns created by this creator
+    pub campaign_count: u32,
+    /// Total number of NFTs created by this creator
+    pub total_nfts_created: u32,
+    /// First campaign ID created by this creator
+    pub first_campaign_id: String,
+    /// Last campaign ID created by this creator
+    pub last_campaign_id: String,
+    /// Unix timestamp of creation
+    pub created_at: i64,
+    /// PDA bump seed
+    pub bump: u8,
+}
+
+impl CreatorCampaigns {
+    pub const LEN: usize = 8 + // discriminator
+        32 +                  // creator (Pubkey)
+        4 +                   // campaign_count (u32)
+        4 +                   // total_nfts_created (u32)
+        32 +                  // first_campaign_id (String)
+        32 +                  // last_campaign_id (String)
         8 +                   // created_at (i64)
         1;                    // bump (u8)
 }

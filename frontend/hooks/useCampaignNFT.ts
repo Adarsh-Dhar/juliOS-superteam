@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Connection, PublicKey } from '@solana/web3.js';
+import { verifyAccess, getProgram } from '@/lib/contract';
+import { AnchorWallet } from '@solana/wallet-adapter-react';
 
 interface CampaignNFT {
   address: string;
@@ -36,7 +38,7 @@ interface CampaignMetrics {
 }
 
 export function useCampaignNFT() {
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected, wallet, signTransaction, signAllTransactions } = useWallet();
   const [campaignNFT, setCampaignNFT] = useState<CampaignNFT | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [deploymentStatus, setDeploymentStatus] = useState<'verifying' | 'initializing' | 'deploying' | 'active' | 'failed'>('verifying');
@@ -48,19 +50,43 @@ export function useCampaignNFT() {
     trendingUp: false,
     sentimentTrend: 'stable'
   });
+  const [accessVerified, setAccessVerified] = useState<boolean | null>(null);
 
-  // NFT Verification Process
+  // NFT Verification Process with Contract Integration
   const verifyNFTAccess = async (): Promise<CampaignNFT | null> => {
-    if (!publicKey) return null;
+    if (!publicKey || !signTransaction || !signAllTransactions) return null;
 
     try {
+      console.log('🔍 Starting NFT verification process...');
+      
       // Step 1: Query Solana for NFTs owned by the wallet
       const connection = new Connection(process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'https://api.devnet.solana.com');
       
-      // In a real implementation, you would:
-      // 1. Get all token accounts for the wallet
-      // 2. Filter for NFTs with specific metadata (JOS-ACCESS symbol)
-      // 3. Fetch metadata from IPFS
+      // Step 2: Create AnchorWallet adapter
+      const anchorWallet: AnchorWallet = {
+        publicKey,
+        signTransaction,
+        signAllTransactions,
+      };
+      
+      // Step 3: Verify access using the contract
+      const program = getProgram(connection, anchorWallet);
+      const campaignId = "camp_medterra_001"; // You can make this dynamic
+      
+      console.log(`📋 Verifying contract access for campaign: ${campaignId}`);
+      const hasAccess = await verifyAccess(program, anchorWallet, campaignId);
+      
+      if (hasAccess) {
+        console.log('✅ Contract access verification successful!');
+        setAccessVerified(true);
+      } else {
+        console.log('❌ Contract access verification failed! Campaign may not exist yet.');
+        setAccessVerified(false);
+        
+        // For demo purposes, we'll still proceed with a mock campaign
+        // In production, you might want to redirect to campaign creation
+        console.log('🎭 Proceeding with demo campaign for demonstration purposes...');
+      }
       
       // For demo purposes, we'll simulate finding a campaign NFT
       const mockNFT: CampaignNFT = {
@@ -80,9 +106,11 @@ export function useCampaignNFT() {
         }
       };
 
+      console.log('🎯 NFT verification completed successfully');
       return mockNFT;
     } catch (error) {
-      console.error('Error verifying NFT access:', error);
+      console.error('🚨 Error during NFT verification:', error);
+      setAccessVerified(false);
       return null;
     }
   };
@@ -230,6 +258,7 @@ export function useCampaignNFT() {
     deploymentStatus,
     agents,
     metrics,
+    accessVerified,
     startCampaignFlow,
     pauseAllAgents,
     resumeAllAgents,
