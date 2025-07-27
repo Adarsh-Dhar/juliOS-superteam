@@ -24,6 +24,26 @@ using .LLMIntegration
 include("agents/Agents.jl")
 using .Agents
 
+# Include new modules for crawler support
+include("agents/AgentFramework.jl")
+using .AgentFramework
+
+include("Vault.jl")
+using .Vault
+
+include("IPFS.jl")
+using .IPFS
+
+include("ReputationKeeper.jl")
+using .ReputationKeeper
+
+include("SwarmComms.jl")
+using .SwarmComms
+
+# Include crawler modules
+include("agents/crawlers/reddit.jl")
+using .Reddit: RedditCrawler
+
 @info "AgentType fields: $(fieldnames(AgentType))"
 
 include("api/server/src/JuliaOSServer.jl")
@@ -56,13 +76,36 @@ const AGENT_STATUS_MAP = Dict(
     "ERROR" => AgentCore.ERROR
 )
 
+# Global registry for custom agent types
+const CUSTOM_AGENT_REGISTRY = Dict{String, Type}()
+
+"""
+    register_custom_agent_type(name::String, agent_type::Type)
+
+Register a custom agent type that can be created through the API.
+"""
+function register_custom_agent_type(name::String, agent_type::Type)
+    CUSTOM_AGENT_REGISTRY[name] = agent_type
+end
+
+# Register the Reddit crawler
+register_custom_agent_type("REDDITCRAWLER", RedditCrawler)
+
 function create_agent(req::HTTP.Request)
     @info "Triggered endpoint: POST /agents"
     body = String(req.body)
     data = JSON.parse(body)
 
     agent_name = data["name"]
-    agent_type = AGENT_TYPE_MAP[uppercase(data["type"])]
+    agent_type_str = uppercase(data["type"])
+    
+    # Check if this is a custom agent type
+    if haskey(CUSTOM_AGENT_REGISTRY, agent_type_str)
+        return create_custom_agent(data, agent_type_str)
+    end
+    
+    # Handle standard agent types
+    agent_type = AGENT_TYPE_MAP[agent_type_str]
 
     agent_config = AgentConfig(
         agent_name,
@@ -88,6 +131,45 @@ function create_agent(req::HTTP.Request)
         "created" => string(agent.created),
         "updated" => string(agent.updated)
     )))
+end
+
+function create_custom_agent(data::Dict, agent_type_str::String)
+    agent_name = data["name"]
+    agent_type_class = CUSTOM_AGENT_REGISTRY[agent_type_str]
+    
+    # Extract configuration for the custom agent
+    config = get(data, "parameters", Dict{String,Any}())
+    
+    # Create the custom agent
+    if agent_type_class == RedditCrawler
+        agent = RedditCrawler(agent_name, config)
+        
+        @info "Created Reddit crawler agent: $(agent.id)"
+        
+        return HTTP.Response(201, JSON.json(Dict(
+            "id" => agent.id,
+            "name" => agent.name,
+            "type" => agent_type_str,
+            "status" => "CREATED",
+            "created" => string(now()),
+            "updated" => string(now())
+        )))
+    elseif agent_type_class == TwitterCrawler
+        agent = TwitterCrawler(agent_name, config)
+        
+        @info "Created Twitter crawler agent: $(agent.id)"
+        
+        return HTTP.Response(201, JSON.json(Dict(
+            "id" => agent.id,
+            "name" => agent.name,
+            "type" => agent_type_str,
+            "status" => "CREATED",
+            "created" => string(now()),
+            "updated" => string(now())
+        )))
+    else
+        return HTTP.Response(400, JSON.json(Dict("error" => "Unsupported custom agent type: $agent_type_str")))
+    end
 end
 
 function list_agents(req::HTTP.Request)
@@ -168,7 +250,7 @@ function get_agent_output(req::HTTP.Request, agent_id::String)
     return Dict{String, Any}()
 end
 
-function run_server(port=8052)
+function run_server(port=8053)
     try
         router = HTTP.Router()
         router = JuliaOSServer.register(router, @__MODULE__; path_prefix="/api/v1")
