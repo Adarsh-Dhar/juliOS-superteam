@@ -47,17 +47,6 @@ using .Reddit: RedditCrawler
 include("agents/crawlers/twitter.jl")
 using .Twitter: TwitterCrawler
 
-include("agents/crawlers/discord.jl")
-using .Discord: DiscordCrawler
-
-include("agents/crawlers/telegram.jl")
-using .Telegram: TelegramCrawler
-
-include("agents/crawlers/instagram.jl")
-using .Instagram: InstagramCrawler
-
-include("agents/crawlers/youtube.jl")
-using .YouTube: YouTubeCrawler
 
 # Include analysis modules
 include("agents/analysis/sentiment.jl")
@@ -121,10 +110,6 @@ end
 # Register the crawler agents
 register_custom_agent_type("REDDITCRAWLER", RedditCrawler)
 register_custom_agent_type("TWITTERCRAWLER", TwitterCrawler)
-register_custom_agent_type("DISCORDCRAWLER", DiscordCrawler)
-register_custom_agent_type("TELEGRAMCRAWLER", TelegramCrawler)
-register_custom_agent_type("INSTAGRAMCRAWLER", InstagramCrawler)
-register_custom_agent_type("YOUTUBECRAWLER", YouTubeCrawler)
 
 # Register the analysis agents
 register_custom_agent_type("SENTIMENTANALYZER", SentimentAgent)
@@ -222,50 +207,6 @@ function create_custom_agent(data::Dict, agent_type_str::String)
         return HTTP.Response(201, JSON.json(Dict(
             "id" => agent.id,
             "name" => agent_name,  # Use the agent_name variable
-            "type" => agent_type_str,
-            "status" => "CREATED",
-            "created" => string(now()),
-            "updated" => string(now())
-        )))
-    elseif agent_type_class == DiscordCrawler
-        agent = DiscordCrawler(agent_name, config)
-        @info "Created Discord crawler agent: $(agent.id)"
-        return HTTP.Response(201, JSON.json(Dict(
-            "id" => agent.id,
-            "name" => agent_name,
-            "type" => agent_type_str,
-            "status" => "CREATED",
-            "created" => string(now()),
-            "updated" => string(now())
-        )))
-    elseif agent_type_class == TelegramCrawler
-        agent = TelegramCrawler(agent_name, config)
-        @info "Created Telegram crawler agent: $(agent.id)"
-        return HTTP.Response(201, JSON.json(Dict(
-            "id" => agent.id,
-            "name" => agent_name,
-            "type" => agent_type_str,
-            "status" => "CREATED",
-            "created" => string(now()),
-            "updated" => string(now())
-        )))
-    elseif agent_type_class == InstagramCrawler
-        agent = InstagramCrawler(agent_name, config)
-        @info "Created Instagram crawler agent: $(agent.id)"
-        return HTTP.Response(201, JSON.json(Dict(
-            "id" => agent.id,
-            "name" => agent_name,
-            "type" => agent_type_str,
-            "status" => "CREATED",
-            "created" => string(now()),
-            "updated" => string(now())
-        )))
-    elseif agent_type_class == YouTubeCrawler
-        agent = YouTubeCrawler(agent_name, config)
-        @info "Created YouTube crawler agent: $(agent.id)"
-        return HTTP.Response(201, JSON.json(Dict(
-            "id" => agent.id,
-            "name" => agent_name,
             "type" => agent_type_str,
             "status" => "CREATED",
             "created" => string(now()),

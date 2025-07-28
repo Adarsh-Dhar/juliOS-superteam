@@ -16,10 +16,6 @@ const AGENT_TYPE_MAP = {
 const PLATFORM_AGENT_MAP = {
   'twitter': 'TWITTERCRAWLER',
   'reddit': 'REDDITCRAWLER',
-  'discord': 'DISCORDCRAWLER',
-  'telegram': 'TELEGRAMCRAWLER',
-  'instagram': 'INSTAGRAMCRAWLER',
-  'youtube': 'YOUTUBECRAWLER'
 };
 
 /**
