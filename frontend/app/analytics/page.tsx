@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { motion } from "framer-motion";
 import {
   Card,
   CardHeader,
@@ -26,6 +27,9 @@ import {
   PieChart,
   Pie,
   Cell,
+  AreaChart,
+  Area,
+  ResponsiveContainer
 } from "recharts";
 import {
   ArrowLeft,
@@ -40,405 +44,674 @@ import {
   AlertTriangle,
   CheckCircle,
   XCircle,
+  Clock,
+  BarChart3,
+  Eye,
+  MessageSquare,
+  Share2,
+  Heart,
+  Loader2,
+  AlertCircle,
+  Filter,
+  Download,
+  RefreshCw
 } from "lucide-react";
 
-function fetcher(url: string) {
-  return fetch(url).then((res) => {
-    if (!res.ok) throw new Error("Failed to fetch");
-    return res.json();
-  });
+interface AnalyticsData {
+  campaign: {
+    id: string;
+    name: string;
+    hashtag: string;
+    description: string;
+    startDate: string;
+    endDate?: string;
+    trustScore: number;
+    status: string;
+  };
+  crawler: {
+    totalPosts: number;
+    platforms: string[];
+    recentActivity: any[];
+    crawlStats: {
+      twitter: { posts: number; engagement: number };
+      reddit: { posts: number; engagement: number };
+      total: { posts: number; engagement: number };
+    };
+    agentStatus: any[];
+  };
+  analysis: {
+    sentiment: {
+      positive: number;
+      negative: number;
+      neutral: number;
+      trend: any[];
+    };
+    trends: {
+      keywords: string[];
+      hashtags: string[];
+      topics: string[];
+      trendData: any[];
+    };
+    engagement: {
+      total: number;
+      rate: number;
+      breakdown: any[];
+    };
+  };
+  consensus: {
+    totalAgents: number;
+    activeAgents: number;
+    consensusScore: number;
+    verificationResults: any[];
+    agentPerformance: any[];
+  };
+  performance: {
+    totalEngagement: number;
+    averageResponseTime: number;
+    reach: number;
+    impressions: number;
+    uniqueUsers: number;
+  };
+  timeline: {
+    posts: any[];
+    engagement: any[];
+    sentiment: any[];
+  };
 }
 
 export default function AnalyticsPage() {
-  const { toast } = useToast();
   const searchParams = useSearchParams();
-  const campaignId = searchParams.get('campaign');
-
-  // State for each analytics section
-  const [campaign, setCampaign] = useState<any>(null);
-  const [trustScore, setTrustScore] = useState<any>(null);
-  const [swarmStats, setSwarmStats] = useState<any>(null);
-  const [timeline, setTimeline] = useState<any[]>([]);
-  const [fraudPatterns, setFraudPatterns] = useState<any[]>([]);
+  const campaignId = searchParams.get("campaign");
+  const { toast } = useToast();
+  
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [campaignDetails, setCampaignDetails] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
-    setLoading(true);
-    
-    const fetchData = async () => {
-      try {
-        // If campaign ID is provided, fetch campaign-specific data
-        if (campaignId) {
-          const [campaignData, campaignDetailsData] = await Promise.all([
-            fetcher(`/api/analytics/campaign/${campaignId}`).catch((e) => {
-              toast({ title: "Error", description: "Failed to load campaign analytics" });
-              return null;
-            }),
-            fetcher(`/api/campaigns/${campaignId}`).catch((e) => {
-              toast({ title: "Error", description: "Failed to load campaign details" });
-              return null;
-            }),
-          ]);
-          
-          setCampaign(campaignData);
-          setCampaignDetails(campaignDetailsData);
-        } else {
-          // Fetch general analytics data
-          const [c, t, s, tl, fp] = await Promise.all([
-            fetcher("/api/analytics/campaign").catch((e) => {
-              toast({ title: "Error", description: "Failed to load campaign summary" });
-              return null;
-            }),
-            fetcher("/api/analytics/trust-score").catch((e) => {
-              toast({ title: "Error", description: "Failed to load trust score" });
-              return null;
-            }),
-            fetcher("/api/analytics/swarm-stats").catch((e) => {
-              toast({ title: "Error", description: "Failed to load swarm stats" });
-              return null;
-            }),
-            fetcher("/api/analytics/timeline").catch((e) => {
-              toast({ title: "Error", description: "Failed to load timeline" });
-              return [];
-            }),
-            fetcher("/api/analytics/fraud-patterns").catch((e) => {
-              toast({ title: "Error", description: "Failed to load fraud patterns" });
-              return { patterns: [] };
-            }),
-          ]);
-          
-          setCampaign(c);
-          setTrustScore(t);
-          setSwarmStats(s);
-          setTimeline(tl);
-          setFraudPatterns(fp.patterns || []);
-        }
-      } catch (error) {
-        console.error('Error fetching analytics data:', error);
-        toast({ title: "Error", description: "Failed to load analytics data" });
-      } finally {
-        setLoading(false);
+    if (!campaignId) {
+      setError("No campaign ID provided");
+      setLoading(false);
+      return;
+    }
+
+    fetchAnalytics();
+  }, [campaignId]);
+
+  const fetchAnalytics = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch(`/api/analytics/campaign/${campaignId}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch analytics");
       }
-    };
 
-    fetchData();
-  }, [campaignId, toast]);
+      const data = await response.json();
+      setAnalyticsData(data);
+    } catch (err: any) {
+      setError(err.message);
+      toast({
+        title: "Error",
+        description: "Failed to load analytics data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const handleBackToCampaigns = () => {
+  const handleRefresh = () => {
+    fetchAnalytics();
+  };
+
+  const handleBack = () => {
     window.history.back();
   };
 
-  return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            {campaignId && (
-              <Button
-                variant="outline"
-                onClick={handleBackToCampaigns}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Campaigns
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0A0F1F] text-white relative overflow-x-hidden">
+        <div className="starfield" />
+        <div className="max-w-7xl mx-auto p-6">
+          <div className="text-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-400" />
+            <p className="text-gray-400 font-exo2">Loading campaign analytics...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !analyticsData) {
+    return (
+      <div className="min-h-screen bg-[#0A0F1F] text-white relative overflow-x-hidden">
+        <div className="starfield" />
+        <div className="max-w-7xl mx-auto p-6">
+          <div className="text-center py-20">
+            <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2 font-orbitron">
+              Error Loading Analytics
+            </h3>
+            <p className="text-gray-400 mb-4 font-exo2">{error}</p>
+            <div className="flex justify-center space-x-4">
+              <Button onClick={handleBack} variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Go Back
               </Button>
-            )}
-            <div>
-              <h1 className="text-3xl font-bold">
-                {campaignId ? 'Campaign Analytics' : 'Analytics Dashboard'}
-              </h1>
-              <p className="text-muted-foreground">
-                {campaignId 
-                  ? `Analytics for campaign: ${campaignDetails?.name || 'Loading...'}`
-                  : 'Overview of all campaigns and engagement'
-                }
-              </p>
+              <Button onClick={fetchAnalytics} className="bg-gradient-to-r from-purple-500 to-blue-500">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Retry
+              </Button>
             </div>
           </div>
         </div>
+      </div>
+    );
+  }
 
-        {/* Campaign Details Banner */}
-        {campaignId && campaignDetails && (
-          <Card className="mb-6 border-blue-200 bg-blue-50">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Target className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-blue-900">{campaignDetails.name}</h3>
-                    <div className="flex items-center gap-4 text-sm text-blue-700">
-                      <span className="flex items-center gap-1">
-                        <Hash className="w-3 h-3" />
-                        #{campaignDetails.hashtag}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        Started {new Date(campaignDetails.startDate).toLocaleDateString()}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Cpu className="w-3 h-3" />
-                        {campaignDetails.metadata?.totalAgents || 0} Agents
-                      </span>
+  const { campaign, crawler, analysis, consensus, performance, timeline } = analyticsData;
+
+  return (
+    <div className="min-h-screen bg-[#0A0F1F] text-white relative overflow-x-hidden">
+      <div className="starfield" />
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Header */}
+        <motion.div 
+          className="mb-8"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-4">
+              <Button onClick={handleBack} variant="outline" size="sm" className="border-gray-600 text-gray-300 hover:bg-gray-800">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+              <div>
+                <h1 className="text-3xl font-bold text-white mb-2 font-orbitron">
+                  Campaign Analytics
+                </h1>
+                <div className="flex items-center space-x-4 text-gray-400 font-exo2">
+                  <span className="flex items-center">
+                    <Hash className="w-4 h-4 mr-1" />
+                    #{campaign.hashtag}
+                  </span>
+                  <span className="flex items-center">
+                    <Calendar className="w-4 h-4 mr-1" />
+                    {new Date(campaign.startDate).toLocaleDateString()}
+                  </span>
+                  <Badge variant={campaign.status === 'active' ? 'default' : 'secondary'} className="bg-purple-500/20 text-purple-400 border-purple-500/30">
+                    {campaign.status}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            <div className="flex space-x-2">
+              <Button onClick={handleRefresh} variant="outline" size="sm" className="border-gray-600 text-gray-300 hover:bg-gray-800">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Refresh
+              </Button>
+              <Button size="sm" className="bg-gradient-to-r from-purple-500 to-blue-500">
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </Button>
+            </div>
+          </div>
+
+          {/* Tab Navigation */}
+          <div className="flex space-x-1 border-b border-gray-700">
+            {[
+              { id: "overview", label: "Overview", icon: BarChart3 },
+              { id: "crawler", label: "Crawler", icon: Globe },
+              { id: "analysis", label: "Analysis", icon: TrendingUp },
+              { id: "consensus", label: "Consensus", icon: Cpu },
+              { id: "timeline", label: "Timeline", icon: Activity },
+            ].map((tab) => (
+              <Button
+                key={tab.id}
+                variant={activeTab === tab.id ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center space-x-2 ${
+                  activeTab === tab.id 
+                    ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white' 
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                }`}
+              >
+                <tab.icon className="w-4 h-4" />
+                <span className="font-exo2">{tab.label}</span>
+              </Button>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Overview Tab */}
+        {activeTab === "overview" && (
+          <motion.div 
+            className="space-y-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            {/* Key Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="glassmorphism border-blue-500/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center">
+                    <div className="p-2 bg-blue-500/20 rounded-lg mr-3">
+                      <Target className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-white">
+                        {crawler.totalPosts}
+                      </div>
+                      <div className="text-sm text-gray-400 font-exo2">Total Posts</div>
                     </div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-blue-900">
-                    {campaignDetails.trustScore?.toFixed(1) || 0}%
+                </CardContent>
+              </Card>
+
+              <Card className="glassmorphism border-green-500/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center">
+                    <div className="p-2 bg-green-500/20 rounded-lg mr-3">
+                      <Activity className="w-5 h-5 text-green-400" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-white">
+                        {performance.totalEngagement.toLocaleString()}
+                      </div>
+                      <div className="text-sm text-gray-400 font-exo2">Total Engagement</div>
+                    </div>
                   </div>
-                  <div className="text-sm text-blue-700">Trust Score</div>
+                </CardContent>
+              </Card>
+
+              <Card className="glassmorphism border-purple-500/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center">
+                    <div className="p-2 bg-purple-500/20 rounded-lg mr-3">
+                      <Cpu className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-white">
+                        {consensus.totalAgents}
+                      </div>
+                      <div className="text-sm text-gray-400 font-exo2">Active Agents</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="glassmorphism border-yellow-500/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center">
+                    <div className="p-2 bg-yellow-500/20 rounded-lg mr-3">
+                      <TrendingUp className="w-5 h-5 text-yellow-400" />
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-white">
+                        {campaign.trustScore.toFixed(1)}%
+                      </div>
+                      <div className="text-sm text-gray-400 font-exo2">Trust Score</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Sentiment Distribution */}
+              <Card className="glassmorphism border-purple-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-white font-orbitron">
+                    <MessageSquare className="w-5 h-5 mr-2 text-purple-400" />
+                    Sentiment Distribution
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: "Positive", value: analysis.sentiment.positive, color: "#10b981" },
+                          { name: "Neutral", value: analysis.sentiment.neutral, color: "#6b7280" },
+                          { name: "Negative", value: analysis.sentiment.negative, color: "#ef4444" },
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        dataKey="value"
+                      >
+                        {[
+                          { name: "Positive", value: analysis.sentiment.positive, color: "#10b981" },
+                          { name: "Neutral", value: analysis.sentiment.neutral, color: "#6b7280" },
+                          { name: "Negative", value: analysis.sentiment.negative, color: "#ef4444" },
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Platform Engagement */}
+              <Card className="glassmorphism border-blue-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-white font-orbitron">
+                    <Globe className="w-5 h-5 mr-2 text-blue-400" />
+                    Platform Engagement
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={Object.entries(crawler.crawlStats).map(([platform, stats]) => ({
+                      platform,
+                      engagement: stats.engagement,
+                      posts: stats.posts
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                      <XAxis dataKey="platform" stroke="#9CA3AF" />
+                      <YAxis stroke="#9CA3AF" />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: '#1F2937', 
+                          border: '1px solid #374151',
+                          borderRadius: '8px',
+                          color: '#F9FAFB'
+                        }}
+                      />
+                      <Bar dataKey="engagement" fill="#3b82f6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Agent Status */}
+            <Card className="glassmorphism border-green-500/20">
+              <CardHeader>
+                <CardTitle className="flex items-center text-white font-orbitron">
+                  <Cpu className="w-5 h-5 mr-2 text-green-400" />
+                  Agent Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="text-center p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                    <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                    <div className="text-2xl font-bold text-green-400">
+                      {consensus.activeAgents}
+                    </div>
+                    <div className="text-sm text-green-400 font-exo2">Active Agents</div>
+                  </div>
+                  <div className="text-center p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                    <Clock className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+                    <div className="text-2xl font-bold text-yellow-400">
+                      {consensus.totalAgents - consensus.activeAgents}
+                    </div>
+                    <div className="text-sm text-yellow-400 font-exo2">Idle Agents</div>
+                  </div>
+                  <div className="text-center p-4 bg-red-500/10 rounded-lg border border-red-500/20">
+                    <XCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+                    <div className="text-2xl font-bold text-red-400">
+                      {crawler.agentStatus.filter((a: any) => a.status === 'OFFLINE').length}
+                    </div>
+                    <div className="text-sm text-red-400 font-exo2">Offline Agents</div>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
         )}
-      </div>
 
-      {/* Analytics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        {/* Campaign Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="w-5 h-5" />
-              {campaignId ? 'Campaign Stats' : 'Campaigns'}
-            </CardTitle>
-            <CardDescription>
-              {campaignId ? 'Performance metrics for this campaign' : 'Overview of campaigns and engagement'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {campaign ? (
-              <div className="space-y-2">
-                {campaignId ? (
-                  <>
-                    <div className="text-lg font-semibold">{campaign.totalPosts || 0} posts</div>
-                    <div className="text-muted-foreground">Engagement: {campaign.engagement || 0}%</div>
-                    <div className="text-muted-foreground">Reach: {campaign.reach || 0}</div>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-lg font-semibold">{campaign.totalCampaigns} campaigns</div>
-                    <div className="text-muted-foreground">{campaign.totalPosts} posts</div>
-                    <div className="text-muted-foreground">Engagement: {campaign.engagement}%</div>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="animate-pulse h-16 bg-muted rounded" />
-            )}
-          </CardContent>
-        </Card>
+        {/* Crawler Tab */}
+        {activeTab === "crawler" && (
+          <motion.div 
+            className="space-y-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            <Card className="glassmorphism border-blue-500/20">
+              <CardHeader>
+                <CardTitle className="flex items-center text-white font-orbitron">
+                  <Globe className="w-5 h-5 mr-2 text-blue-400" />
+                  Crawler Performance
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="text-center p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                    <div className="text-2xl font-bold text-blue-400">
+                      {crawler.totalPosts}
+                    </div>
+                    <div className="text-sm text-blue-400 font-exo2">Total Posts Crawled</div>
+                  </div>
+                  <div className="text-center p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                    <div className="text-2xl font-bold text-green-400">
+                      {performance.averageResponseTime.toFixed(1)}s
+                    </div>
+                    <div className="text-sm text-green-400 font-exo2">Avg Response Time</div>
+                  </div>
+                  <div className="text-center p-4 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                    <div className="text-2xl font-bold text-purple-400">
+                      {crawler.platforms.length}
+                    </div>
+                    <div className="text-sm text-purple-400 font-exo2">Platforms Monitored</div>
+                  </div>
+                </div>
 
-        {/* Trust Score */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" />
-              Trust Score
-            </CardTitle>
-            <CardDescription>
-              {campaignId ? 'Campaign confidence level' : 'Average confidence of authentic verifications'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {trustScore ? (
-              <div className="text-3xl font-bold">{trustScore.score}</div>
-            ) : (
-              <div className="animate-pulse h-10 bg-muted rounded" />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Swarm Stats */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="w-5 h-5" />
-              {campaignId ? 'Agent Activity' : 'Swarm Stats'}
-            </CardTitle>
-            <CardDescription>
-              {campaignId ? 'Campaign agent performance' : 'Network health and agent activity'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {swarmStats ? (
-              <div className="space-y-2">
-                {campaignId ? (
-                  <>
-                    <div className="font-semibold">Active Agents: {swarmStats.activeAgents || 0}</div>
-                    <div className="text-muted-foreground">Posts Analyzed: {swarmStats.postsAnalyzed || 0}</div>
-                    <div className="text-muted-foreground">Success Rate: {swarmStats.successRate || 0}%</div>
-                  </>
-                ) : (
-                  <>
-                    <div className="font-semibold">Active Agents: {swarmStats.activeAgents}</div>
-                    <div className="text-muted-foreground">Verified Today: {swarmStats.verifiedToday}</div>
-                    <div className="text-muted-foreground">Network Health: {swarmStats.networkHealth}%</div>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="animate-pulse h-16 bg-muted rounded" />
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Timeline Chart */}
-      <div className="mb-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {campaignId ? 'Campaign Timeline' : 'Verification Timeline'}
-            </CardTitle>
-            <CardDescription>
-              {campaignId 
-                ? 'Campaign performance and engagement over time'
-                : 'Authentic, suspicious, and fake verifications over time'
-              }
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {timeline && timeline.length > 0 ? (
-              <ChartContainer
-                config={{
-                  authentic: { label: "Authentic", color: "#22c55e" },
-                  suspicious: { label: "Suspicious", color: "#eab308" },
-                  fake: { label: "Fake", color: "#ef4444" },
-                  engagement: { label: "Engagement", color: "#3b82f6" },
-                  posts: { label: "Posts", color: "#8b5cf6" },
-                }}
-                className="h-72"
-              >
-                <LineChart data={timeline} margin={{ top: 16, right: 16, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="time" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Legend />
-                  {campaignId ? (
-                    <>
-                      <Line type="monotone" dataKey="posts" stroke="#8b5cf6" strokeWidth={2} />
-                      <Line type="monotone" dataKey="engagement" stroke="#3b82f6" strokeWidth={2} />
-                    </>
-                  ) : (
-                    <>
-                      <Line type="monotone" dataKey="authentic" stroke="#22c55e" strokeWidth={2} />
-                      <Line type="monotone" dataKey="suspicious" stroke="#eab308" strokeWidth={2} />
-                      <Line type="monotone" dataKey="fake" stroke="#ef4444" strokeWidth={2} />
-                    </>
-                  )}
-                </LineChart>
-              </ChartContainer>
-            ) : (
-              <div className="animate-pulse h-72 bg-muted rounded" />
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Fraud Patterns or Campaign Insights */}
-      <div>
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              {campaignId ? 'Campaign Insights' : 'Fraud Patterns'}
-            </CardTitle>
-            <CardDescription>
-              {campaignId 
-                ? 'Key insights and patterns from this campaign'
-                : 'Detected fraud types and their severity'
-              }
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {campaignId ? (
-              // Campaign-specific insights
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="font-semibold mb-3">Platform Performance</h4>
-                  <div className="space-y-2">
-                    {campaignDetails?.metadata?.platforms?.map((platform: string) => (
-                      <div key={platform} className="flex items-center justify-between p-2 bg-slate-50 rounded">
-                        <span className="flex items-center gap-2">
-                          <Globe className="w-4 h-4" />
-                          {platform}
-                        </span>
-                        <Badge variant="secondary">Active</Badge>
+                {/* Platform Breakdown */}
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-white font-orbitron">Platform Breakdown</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(crawler.crawlStats).map(([platform, stats]) => (
+                      <div key={platform} className="p-4 border border-gray-600/50 rounded-lg bg-gray-800/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-medium text-white capitalize font-exo2">
+                            {platform}
+                          </span>
+                          <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10">
+                            {stats.posts} posts
+                          </Badge>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-400">Engagement:</span>
+                            <span className="font-medium text-white">{stats.engagement.toLocaleString()}</span>
+                          </div>
+                          <div className="w-full bg-gray-700 rounded-full h-2">
+                            <div
+                              className="bg-blue-500 h-2 rounded-full"
+                              style={{
+                                width: `${Math.min((stats.engagement / performance.totalEngagement) * 100, 100)}%`
+                              }}
+                            />
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
-                <div>
-                  <h4 className="font-semibold mb-3">Agent Status</h4>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 bg-green-50 rounded">
-                      <span className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                        Crawler Agents
-                      </span>
-                      <span className="text-sm font-medium">{campaignDetails?.metadata?.agentDetails?.crawlers?.length || 0}</span>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Analysis Tab */}
+        {activeTab === "analysis" && (
+          <motion.div 
+            className="space-y-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            <Card className="glassmorphism border-green-500/20">
+              <CardHeader>
+                <CardTitle className="flex items-center text-white font-orbitron">
+                  <TrendingUp className="w-5 h-5 mr-2 text-green-400" />
+                  Sentiment Analysis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="text-center p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                    <div className="text-2xl font-bold text-green-400">
+                      {analysis.sentiment.positive}
                     </div>
-                    <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
-                      <span className="flex items-center gap-2">
-                        <Cpu className="w-4 h-4 text-blue-600" />
-                        Analyzer Agents
-                      </span>
-                      <span className="text-sm font-medium">{campaignDetails?.metadata?.agentDetails?.fixedAnalyzers?.length || 0}</span>
+                    <div className="text-sm text-green-400 font-exo2">Positive Posts</div>
+                  </div>
+                  <div className="text-center p-4 bg-gray-500/10 rounded-lg border border-gray-500/20">
+                    <div className="text-2xl font-bold text-gray-400">
+                      {analysis.sentiment.neutral}
                     </div>
+                    <div className="text-sm text-gray-400 font-exo2">Neutral Posts</div>
+                  </div>
+                  <div className="text-center p-4 bg-red-500/10 rounded-lg border border-red-500/20">
+                    <div className="text-2xl font-bold text-red-400">
+                      {analysis.sentiment.negative}
+                    </div>
+                    <div className="text-sm text-red-400 font-exo2">Negative Posts</div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              // General fraud patterns
-              fraudPatterns && fraudPatterns.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="text-muted-foreground">
-                        <th className="px-2 py-1 text-left">Type</th>
-                        <th className="px-2 py-1 text-left">Count</th>
-                        <th className="px-2 py-1 text-left">Confidence</th>
-                        <th className="px-2 py-1 text-left">Severity</th>
-                        <th className="px-2 py-1 text-left">Related</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {fraudPatterns.map((pattern: any) => (
-                        <tr key={pattern.id} className="border-b last:border-0">
-                          <td className="px-2 py-1 font-medium">{pattern.type}</td>
-                          <td className="px-2 py-1">{pattern.count}</td>
-                          <td className="px-2 py-1">{pattern.confidence.toFixed(2)}</td>
-                          <td className="px-2 py-1">
-                            <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                              pattern.severity === "high"
-                                ? "bg-red-100 text-red-700"
-                                : pattern.severity === "medium"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-green-100 text-green-700"
-                            }`}>
-                              {pattern.severity}
-                            </span>
-                          </td>
-                          <td className="px-2 py-1">
-                            {pattern.relatedPatterns.join(", ")}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+
+                {/* Trending Topics */}
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-white font-orbitron">Trending Topics</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {analysis.trends.keywords.slice(0, 10).map((keyword, index) => (
+                      <Badge key={index} variant="outline" className="text-sm border-purple-500/30 text-purple-400 bg-purple-500/10">
+                        {keyword}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-              ) : (
-                <div className="animate-pulse h-16 bg-muted rounded" />
-              )
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Consensus Tab */}
+        {activeTab === "consensus" && (
+          <motion.div 
+            className="space-y-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            <Card className="glassmorphism border-purple-500/20">
+              <CardHeader>
+                <CardTitle className="flex items-center text-white font-orbitron">
+                  <Cpu className="w-5 h-5 mr-2 text-purple-400" />
+                  Consensus Verification
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="text-center p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                    <div className="text-2xl font-bold text-green-400">
+                      {consensus.consensusScore.toFixed(1)}%
+                    </div>
+                    <div className="text-sm text-green-400 font-exo2">Consensus Score</div>
+                  </div>
+                  <div className="text-center p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                    <div className="text-2xl font-bold text-blue-400">
+                      {consensus.totalAgents}
+                    </div>
+                    <div className="text-sm text-blue-400 font-exo2">Total Agents</div>
+                  </div>
+                  <div className="text-center p-4 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                    <div className="text-2xl font-bold text-purple-400">
+                      {consensus.activeAgents}
+                    </div>
+                    <div className="text-sm text-purple-400 font-exo2">Active Agents</div>
+                  </div>
+                </div>
+
+                {/* Agent Performance */}
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-white font-orbitron">Agent Performance</h4>
+                  <div className="space-y-2">
+                    {consensus.agentPerformance.slice(0, 5).map((agent: any, index: number) => (
+                      <div key={index} className="flex items-center justify-between p-3 border border-gray-600/50 rounded-lg bg-gray-800/30">
+                        <div className="flex items-center space-x-3">
+                          <div className={`w-3 h-3 rounded-full ${
+                            agent.status === 'ACTIVE' ? 'bg-green-500' : 
+                            agent.status === 'IDLE' ? 'bg-yellow-500' : 'bg-red-500'
+                          }`} />
+                          <span className="font-medium text-white font-exo2">{agent.name}</span>
+                        </div>
+                        <div className="text-sm text-gray-400 font-exo2">
+                          {agent.accuracy?.toFixed(1)}% accuracy
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Timeline Tab */}
+        {activeTab === "timeline" && (
+          <motion.div 
+            className="space-y-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            <Card className="glassmorphism border-blue-500/20">
+              <CardHeader>
+                <CardTitle className="flex items-center text-white font-orbitron">
+                  <Activity className="w-5 h-5 mr-2 text-blue-400" />
+                  Activity Timeline
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={400}>
+                  <AreaChart data={timeline.posts.slice(-30)}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="date" stroke="#9CA3AF" />
+                    <YAxis stroke="#9CA3AF" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#1F2937', 
+                        border: '1px solid #374151',
+                        borderRadius: '8px',
+                        color: '#F9FAFB'
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="posts"
+                      stackId="1"
+                      stroke="#3b82f6"
+                      fill="#3b82f6"
+                      fillOpacity={0.6}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="engagement"
+                      stackId="2"
+                      stroke="#10b981"
+                      fill="#10b981"
+                      fillOpacity={0.6}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
       </div>
     </div>
   );
