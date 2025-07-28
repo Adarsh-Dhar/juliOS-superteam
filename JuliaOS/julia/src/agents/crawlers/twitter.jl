@@ -1,4 +1,18 @@
 # Crawlers/Twitter.jl
+# 
+# Twitter API Crawler for JuliaOS
+# 
+# Required Environment Variables:
+# - TWITTER_BEARER_TOKEN: Your Twitter API v2 Bearer Token
+# - TWITTER_CLIENT_ID: Your Twitter API Client ID  
+# - TWITTER_CLIENT_SECRET: Your Twitter API Client Secret
+# - TWITTER_ACCESS_TOKEN: Your Twitter API Access Token
+# - TWITTER_ACCESS_TOKEN_SECRET: Your Twitter API Access Token Secret
+#
+# Note: Twitter API tokens do not auto-refresh. When tokens expire,
+# you need to manually regenerate them through the Twitter Developer Portal.
+# The crawler will detect authentication errors and provide helpful error messages.
+
 module Twitter
 
 using HTTP, JSON3, Dates, Base64, SHA, Random
@@ -44,10 +58,14 @@ struct Tweet
     media::Vector{Dict}
 end
 
-struct TwitterCrawler <: AbstractAgent
+mutable struct TwitterCrawler <: AbstractAgent
     id::String
     config::Dict
     bearer_token::String
+    client_id::String
+    client_secret::String
+    access_token::String
+    access_token_secret::String
     last_scrape::DateTime
     proxy_pool::Vector{String}
     current_proxy::String
@@ -55,11 +73,23 @@ struct TwitterCrawler <: AbstractAgent
     backoff_until::DateTime
     next_token::String  # For pagination
     error_count::Int  # Add error count field
+    status::String  # Add status field
+    start_time::DateTime  # Add start_time field
 end
 
 function TwitterCrawler(id::String, config::Dict)
+    # Check environment variables first
+    if !check_twitter_env_vars()
+        error("Twitter API environment variables are not set. Please set TWITTER_BEARER_TOKEN, TWITTER_CLIENT_ID, TWITTER_CLIENT_SECRET, TWITTER_ACCESS_TOKEN, and TWITTER_ACCESS_TOKEN_SECRET.")
+    end
+    
     # Get credentials from secure vault
     creds = Vault.get_secrets("twitter_api")
+    
+    # Validate credentials before proceeding
+    if !validate_twitter_credentials(creds)
+        error("Twitter API credentials are missing or invalid. Please check environment variables.")
+    end
     
     # Initialize proxy pool
     region = get(config, "region", "global")
@@ -87,19 +117,75 @@ function TwitterCrawler(id::String, config::Dict)
         id,
         merged_config,
         creds["bearer_token"],
+        creds["client_id"],
+        creds["client_secret"],
+        creds["access_token"],
+        creds["access_token_secret"],
         now() - Minute(10),  # Start immediately
         proxies,
         isempty(proxies) ? "" : rand(proxies),
         rand(DEFAULT_USER_AGENTS),
         now(),
         "",  # Initial pagination token
-        0    # Initial error count
+        0,    # Initial error count
+        "CREATED", # Initial status
+        now() # Initial start time
     )
 end
 
 # Add missing helper functions
 function error_count(agent::TwitterCrawler)
     return agent.error_count
+end
+
+function validate_twitter_credentials(creds::Dict{String, Any})
+    """Validate that all required Twitter API credentials are present"""
+    required_fields = ["bearer_token", "client_id", "client_secret", "access_token", "access_token_secret"]
+    missing_fields = String[]
+    
+    for field in required_fields
+        if !haskey(creds, field) || isempty(creds[field])
+            push!(missing_fields, field)
+        end
+    end
+    
+    if !isempty(missing_fields)
+        @error "Missing or empty Twitter API credentials: $(join(missing_fields, ", "))"
+        @error "Please set the following environment variables:"
+        for field in missing_fields
+            env_var = "TWITTER_$(uppercase(replace(field, "_" => "")))"
+            @error "  - $env_var"
+        end
+        return false
+    end
+    
+    return true
+end
+
+function check_twitter_env_vars()
+    """Check if all required Twitter environment variables are set"""
+    required_vars = [
+        "TWITTER_BEARER_TOKEN",
+        "TWITTER_CLIENT_ID", 
+        "TWITTER_CLIENT_SECRET",
+        "TWITTER_ACCESS_TOKEN",
+        "TWITTER_ACCESS_TOKEN_SECRET"
+    ]
+    
+    missing_vars = String[]
+    for var in required_vars
+        if !haskey(ENV, var) || isempty(ENV[var])
+            push!(missing_vars, var)
+        end
+    end
+    
+    if !isempty(missing_vars)
+        @warn "Missing Twitter environment variables: $(join(missing_vars, ", "))"
+        @warn "Twitter crawler will fail to initialize without these variables"
+        return false
+    end
+    
+    return true
 end
 
 function compress(data::IOBuffer)
@@ -113,16 +199,24 @@ function process_tweets(tweets::Vector{Tweet})
 end
 
 function run(agent::TwitterCrawler)
+    @info "Starting Twitter crawler: $(agent.id)"
+    @info "Crawler config: $(agent.config)"
+    
     # Register with reputation system
     ReputationKeeper.stake(agent.id, 0.1)
     
     while is_active(agent)
         try
+            @info "Twitter crawler $(agent.id) is active, checking backoff..."
+            
             # Check if in backoff period
             if now() < agent.backoff_until
+                @info "Twitter crawler $(agent.id) in backoff until $(agent.backoff_until)"
                 sleep(ceil(Int, (agent.backoff_until - now()).value / 1000))
                 continue
             end
+            
+            @info "Twitter crawler $(agent.id) starting scrape..."
             
             # Rotate resources
             rotate_resources!(agent)
@@ -130,10 +224,34 @@ function run(agent::TwitterCrawler)
             # Scrape data
             tweets = scrape_twitter(agent)
             
+            @info "Twitter crawler $(agent.id) scraped $(length(tweets)) tweets"
+            
             if !isempty(tweets)
+                # Log tweets to console
+                println("=== TWITTER CRAWLER $(agent.id) - CRAWLED TWEETS ===")
+                for (i, tweet) in enumerate(tweets)
+                    println("Tweet $i:")
+                    println("  ID: $(tweet.id)")
+                    println("  Text: $(tweet.text)")
+                    println("  Author: $(tweet.author_hash)")
+                    println("  Created: $(tweet.created_at)")
+                    println("  Language: $(tweet.language)")
+                    println("  Metrics: $(tweet.like_count) likes, $(tweet.retweet_count) retweets, $(tweet.reply_count) replies")
+                    println("  URL: $(tweet.url)")
+                    println("  Hashtags: $(join(tweet.hashtags, ", "))")
+                    println("  Mentions: $(join(tweet.mentions, ", "))")
+                    println("  Is Retweet: $(tweet.is_retweet)")
+                    println("  Is Quote: $(tweet.is_quote)")
+                    println("  Sensitive: $(tweet.possibly_sensitive)")
+                    println("---")
+                end
+                println("=== END OF TWEETS ===")
+                
                 # Process and store
                 processed = process_tweets(tweets)
                 cid = store_data(processed)
+                
+                @info "Twitter crawler $(agent.id) stored data with CID: $cid"
                 
                 # Send to analyzers
                 send_to_analyzers(agent, cid, length(tweets))
@@ -147,23 +265,34 @@ function run(agent::TwitterCrawler)
                     "scrape_success", 
                     Dict("tweet_count" => length(tweets))
                 )
+                
+                @info "Twitter crawler $(agent.id) completed successful scrape"
+            else
+                @info "Twitter crawler $(agent.id) found no tweets"
             end
             
             # Sleep until next scrape
-            sleep(agent.config["scrape_interval"])
+            sleep_time = agent.config["scrape_interval"]
+            @info "Twitter crawler $(agent.id) sleeping for $sleep_time seconds"
+            sleep(sleep_time)
             
         catch e
+            @error "Twitter crawler $(agent.id) encountered error: $e"
             handle_error(agent, e)
             # Exponential backoff
             backoff = min(2^(error_count(agent)) * 60, 3600)  # Max 1 hour
             agent.backoff_until = now() + Second(backoff)
         end
     end
+    
+    @info "Twitter crawler $(agent.id) stopped"
 end
 
 function scrape_twitter(agent::TwitterCrawler)
     tweets = Tweet[]
     query = build_query(agent)
+    
+    @info "Twitter crawler $(agent.id) building query: $query"
     
     while length(tweets) < agent.config["max_tweets"]
         # Build API URL
@@ -175,19 +304,30 @@ function scrape_twitter(agent::TwitterCrawler)
               "&user.fields=created_at" *
               (isempty(agent.next_token) ? "" : "&next_token=$(agent.next_token)")
         
+        @info "Twitter crawler $(agent.id) making request to: $url"
+        
         # Make request
         headers = [
             "Authorization" => "Bearer $(agent.bearer_token)",
             "User-Agent" => agent.user_agent
         ]
         
-        response = HTTP.get(
-            url,
-            headers=headers,
-            proxy=agent.current_proxy,
-            readtimeout=30,
-            retry=false
+        # Handle proxy properly - only use if not empty
+        request_kwargs = Dict{Symbol, Any}(
+            :headers => headers,
+            :readtimeout => 30,
+            :retry => false
         )
+        
+        # Only add proxy if it's not empty
+        if !isempty(agent.current_proxy)
+            request_kwargs[:proxy] = agent.current_proxy
+            @info "Twitter crawler $(agent.id) using proxy: $(agent.current_proxy)"
+        else
+            @info "Twitter crawler $(agent.id) not using proxy"
+        end
+        
+        response = HTTP.get(url; request_kwargs...)
         
         # Handle rate limits
         handle_rate_limits(response)
@@ -216,15 +356,27 @@ end
 function build_query(agent::TwitterCrawler)
     query_parts = String[]
     
-    # Keywords
+    # Keywords - don't wrap single keyword in parentheses
     if !isempty(agent.config["keywords"])
-        push!(query_parts, "($(join(agent.config["keywords"], " OR ")))")
+        if length(agent.config["keywords"]) == 1
+            push!(query_parts, agent.config["keywords"][1])
+        else
+            push!(query_parts, "($(join(agent.config["keywords"], " OR ")))")
+        end
     end
     
     # Hashtags
     if !isempty(agent.config["hashtags"])
-        hashtags = ["#$tag" for tag in agent.config["hashtags"]]
-        push!(query_parts, "($(join(hashtags, " OR ")))")
+        hashtags = String[]
+        for tag in agent.config["hashtags"]
+            clean_tag = replace(tag, r"^#" => "")
+            push!(hashtags, "#$clean_tag")
+        end
+        if length(hashtags) == 1
+            push!(query_parts, hashtags[1])
+        else
+            push!(query_parts, "($(join(hashtags, " OR ")))")
+        end
     end
     
     # Users
@@ -245,7 +397,7 @@ function build_query(agent::TwitterCrawler)
     if !agent.config["include_replies"]
         push!(query_parts, "-is:reply")
     end
-    push!(query_parts, "-is:nullcast")  # Always exclude nullcast
+    push!(query_parts, "-is:nullcast")
     
     # Combine query parts
     return join(query_parts, " ")
@@ -449,10 +601,38 @@ function handle_error(agent::TwitterCrawler, e)
     ReputationKeeper.report(agent.id, "error", Dict("type" => error_type))
     
     if error_type == "authentication"
-        # Twitter bearer tokens don't refresh automatically
-        @warn "Authentication error - check token validity"
+        # Twitter tokens don't refresh automatically - manual intervention required
+        @error "Twitter authentication failed - tokens may be expired or invalid"
+        @error "Please check and update the following environment variables:"
+        @error "  - TWITTER_BEARER_TOKEN"
+        @error "  - TWITTER_CLIENT_ID" 
+        @error "  - TWITTER_CLIENT_SECRET"
+        @error "  - TWITTER_ACCESS_TOKEN"
+        @error "  - TWITTER_ACCESS_TOKEN_SECRET"
+        @error "Twitter API tokens need manual renewal when they expire"
+        
+        # Set a longer backoff for authentication errors
+        agent.backoff_until = now() + Hour(1)
     elseif error_type == "rate_limit"
-        agent.backoff_until = now() + Minute(15)
+        # Calculate proper backoff based on Twitter's rate limit reset time
+        if e isa HTTPException
+            reset_header = HTTP.header(e.response, "x-rate-limit-reset", "")
+            if !isempty(reset_header)
+                reset_time = tryparse(Int, reset_header)
+                if reset_time !== nothing
+                    current_time = round(Int, time())
+                    wait_seconds = max(reset_time - current_time, 0) + 60  # Add 1 minute buffer
+                    agent.backoff_until = now() + Second(wait_seconds)
+                    @info "Twitter rate limit hit. Waiting until $(agent.backoff_until) (reset time: $reset_time, current: $current_time, wait: $wait_seconds seconds)"
+                else
+                    agent.backoff_until = now() + Hour(1)  # Fallback to 1 hour
+                end
+            else
+                agent.backoff_until = now() + Hour(1)  # Fallback to 1 hour
+            end
+        else
+            agent.backoff_until = now() + Hour(1)  # Fallback to 1 hour
+        end
     elseif error_type == "ban"
         rotate_resources!(agent)
         agent.backoff_until = now() + Hour(2)
@@ -478,9 +658,28 @@ function classify_error(e)
 end
 
 function is_active(agent::TwitterCrawler)
-    # Check campaign duration
-    end_time = agent.config["start_time"] + Second(agent.config["duration"])
-    return now() < end_time && agent.status != "terminated"
+    # Check if agent is terminated
+    if agent.status == "terminated"
+        return false
+    end
+    
+    # Check campaign duration if specified
+    if haskey(agent.config, "duration")
+        end_time = agent.start_time + Second(agent.config["duration"])
+        return now() < end_time
+    end
+    
+    return true  # Default to active if no duration specified
 end
 
 end # module Twitter
+
+# Add to the top of twitter.jl after the imports
+struct HTTPException <: Exception
+    status::Int
+    body::Vector{UInt8}
+end
+
+struct AuthenticationException <: Exception
+    message::String
+end

@@ -16,14 +16,13 @@ Get secrets for a specific service.
 function get_secrets(service::String)
     if !haskey(SECRETS, service)
         if service == "twitter_api"
-            # Return default Twitter API credentials
+            # Return Twitter API credentials (no refresh token available)
             SECRETS[service] = Dict{String, Any}(
                 "bearer_token" => get(ENV, "TWITTER_BEARER_TOKEN", ""),
                 "client_id" => get(ENV, "TWITTER_CLIENT_ID", ""),
                 "client_secret" => get(ENV, "TWITTER_CLIENT_SECRET", ""),
                 "access_token" => get(ENV, "TWITTER_ACCESS_TOKEN", ""),
-                "refresh_token" => get(ENV, "TWITTER_REFRESH_TOKEN", ""),
-                "expires_at" => now() + Hour(1)  # Default 1 hour expiry
+                "access_token_secret" => get(ENV, "TWITTER_ACCESS_TOKEN_SECRET", "")
             )
         else
             # Return default Reddit API credentials

@@ -200,18 +200,45 @@ function create_custom_agent(data::Dict, agent_type_str::String)
             "updated" => string(now())
         )))
     elseif agent_type_class == TwitterCrawler
-        agent = TwitterCrawler(agent_name, config)
-        
-        @info "Created Twitter crawler agent: $(agent.id)"
-        
-        return HTTP.Response(201, JSON.json(Dict(
-            "id" => agent.id,
-            "name" => agent_name,  # Use the agent_name variable
-            "type" => agent_type_str,
-            "status" => "CREATED",
-            "created" => string(now()),
-            "updated" => string(now())
-        )))
+        @info "Creating TwitterCrawler..."
+        try
+            agent = TwitterCrawler(agent_name, config)
+            @info "Successfully created TwitterCrawler with id: $(agent.id)"
+            
+            # Store the custom agent
+            CUSTOM_AGENTS[agent.id] = agent
+            @info "Stored agent in CUSTOM_AGENTS registry"
+            
+            # Auto-start the crawler if configured
+            if get(config, "auto_start", false)
+                @info "Auto-starting Twitter crawler: $(agent.id)"
+                agent.status = "RUNNING"
+                @async Twitter.run(agent)
+            end
+            
+            @info "Created Twitter crawler agent: $(agent.id)"
+            
+            return HTTP.Response(201, JSON.json(Dict(
+                "id" => agent.id,
+                "name" => agent_name,  # Use the agent_name variable
+                "type" => agent_type_str,
+                "status" => "CREATED",
+                "created" => string(now()),
+                "updated" => string(now())
+            )))
+        catch e
+            @error "Error creating TwitterCrawler: $e"
+            @error "Stacktrace: $(stacktrace())"
+            
+            # Provide specific error message for credential issues
+            error_msg = if occursin("credentials", lowercase(string(e)))
+                "Twitter API credentials are missing or invalid. Please check environment variables: TWITTER_BEARER_TOKEN, TWITTER_CLIENT_ID, TWITTER_CLIENT_SECRET, TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET"
+            else
+                "Failed to create TwitterCrawler: $e"
+            end
+            
+            return HTTP.Response(500, JSON.json(Dict("error" => error_msg)))
+        end
     elseif agent_type_class == SentimentAgent
         @info "Creating SentimentAgent..."
         try
@@ -298,12 +325,29 @@ function list_agents(req::HTTP.Request)
     # Add custom agents to the list
     for (id, agent) in CUSTOM_AGENTS
         try
+            # Access struct fields directly
+            agent_id = agent.id
+            agent_name = agent.id  # Use id as name for now
+            agent_status = agent.status
+            
+            # Determine agent type based on the actual agent type
+            agent_type = "CUSTOM"
+            if agent isa Twitter.TwitterCrawler
+                agent_type = "TWITTERCRAWLER"
+            elseif agent isa Reddit.RedditCrawler
+                agent_type = "REDDITCRAWLER"
+            elseif agent isa SentimentAgent
+                agent_type = "SENTIMENTANALYZER"
+            elseif agent isa TrendAgent
+                agent_type = "TRENDANALYZER"
+            end
+            
             push!(api_agents, Dict(
-                "id" => get(agent, :id, id),
-                "name" => get(agent, :name, "Custom Agent"),
-                "type" => "CUSTOM",
-                "status" => "CREATED",
-                "state" => "CREATED"
+                "id" => agent_id,
+                "name" => agent_name,
+                "type" => agent_type,
+                "status" => agent_status,
+                "state" => agent_status
             ))
         catch e
             @warn "Error processing custom agent $id: $e"
@@ -320,15 +364,56 @@ end
 
 function update_agent(req::HTTP.Request, agent_id::String, update::AgentUpdate)
     @info "Triggered endpoint: PUT /agents/$(agent_id)"
+    
+    # First check if it's a custom agent
+    if haskey(CUSTOM_AGENTS, agent_id)
+        agent = CUSTOM_AGENTS[agent_id]
+        new_state = update.state
+        valid_states = ["RUNNING", "PAUSED", "STOPPED"]
+        
+        if new_state === nothing || !(new_state in valid_states)
+            return HTTP.Response(400, JSON.json(Dict("error" => "Invalid or missing state. Must be one of: RUNNING, PAUSED, STOPPED.")))
+        end
+        
+        # Handle custom agent state changes
+        if new_state == "RUNNING"
+            if agent isa Twitter.TwitterCrawler
+                @info "Starting Twitter crawler: $(agent_id)"
+                agent.status = "RUNNING"
+                @async Twitter.run(agent)
+            elseif agent isa Reddit.RedditCrawler
+                @info "Starting Reddit crawler: $(agent_id)"
+                agent.status = "RUNNING"
+                @async Reddit.run(agent)
+            else
+                @info "Starting custom agent: $(agent_id)"
+                agent.status = "RUNNING"
+            end
+        elseif new_state == "PAUSED"
+            agent.status = "PAUSED"
+        elseif new_state == "STOPPED"
+            agent.status = "STOPPED"
+        end
+        
+        return HTTP.Response(200, JSON.json(Dict(
+            "id" => agent_id,
+            "name" => get(agent, :name, "Custom Agent"),
+            "state" => new_state
+        )))
+    end
+    
+    # Handle standard agents
     ag = Agents.getAgent(agent_id)
     if ag === nothing
         return HTTP.Response(404, JSON.json(Dict("error" => "Agent not found")))
     end
+    
     new_state = update.state
     valid_states = ["RUNNING", "PAUSED", "STOPPED"]
     if new_state === nothing || !(new_state in valid_states)
         return HTTP.Response(400, JSON.json(Dict("error" => "Invalid or missing state. Must be one of: RUNNING, PAUSED, STOPPED.")))
     end
+    
     success = false
     if new_state == "RUNNING"
         if ag.status == Agents.PAUSED
@@ -343,16 +428,16 @@ function update_agent(req::HTTP.Request, agent_id::String, update::AgentUpdate)
     elseif new_state == "STOPPED"
         success = Agents.stopAgent(agent_id)
     end
+    
     if !success
         return HTTP.Response(500, JSON.json(Dict("error" => "Failed to update agent state")))
     end
-    # Return the intended state, not the actual (possibly lagging) state
-    api_agent = Dict(
+    
+    return HTTP.Response(200, JSON.json(Dict(
         "id" => ag.id,
         "name" => ag.name,
         "state" => new_state
-    )
-    return HTTP.Response(200, JSON.json(api_agent))
+    )))
 end
 
 function delete_agent(req::HTTP.Request, agent_id::String)
