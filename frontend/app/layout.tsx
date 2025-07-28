@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Inter, Orbitron, Exo_2 } from 'next/font/google';
 import { SolanaProvider } from '../components/SolanaProvider';
+import { Toaster } from '@/components/ui/toaster';
 
 const inter = Inter({ subsets: ['latin'] });
 const orbitron = Orbitron({ 
@@ -30,6 +31,7 @@ export default function RootLayout({
       <SolanaProvider>
       <body className={`${inter.className} bg-[#0A0F1F] text-white overflow-x-hidden`}>
         {children}
+        <Toaster />
       </body>
       </SolanaProvider>
     </html>
