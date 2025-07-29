@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-const JULIA_API_BASE = process.env.JULIA_API_BASE || 'http://localhost:8053/api/v1';
+const JULIA_API_BASE = process.env.JULIA_API_BASE || 'http://localhost:8055/api/v1';
 
 export async function GET(
   req: NextRequest,

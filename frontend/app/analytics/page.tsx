@@ -249,14 +249,14 @@ export default function AnalyticsPage() {
                 <div className="flex items-center space-x-4 text-gray-400 font-exo2">
                   <span className="flex items-center">
                     <Hash className="w-4 h-4 mr-1" />
-                    #{campaign.hashtag}
+                    
                   </span>
-                  <span className="flex items-center">
+                  {/* <span className="flex items-center">
                     <Calendar className="w-4 h-4 mr-1" />
                     {new Date(campaign.startDate).toLocaleDateString()}
-                  </span>
-                  <Badge variant={campaign.status === 'active' ? 'default' : 'secondary'} className="bg-purple-500/20 text-purple-400 border-purple-500/30">
-                    {campaign.status}
+                  </span> */}
+                  <Badge variant={campaign?.status === 'active' ? 'default' : 'secondary'} className="bg-purple-500/20 text-purple-400 border-purple-500/30">
+                    {campaign?.status || 'Unknown'}
                   </Badge>
                 </div>
               </div>

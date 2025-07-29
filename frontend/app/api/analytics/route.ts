@@ -121,6 +121,7 @@ interface AnalyticsData {
 
 async function runJuliaScript(scriptPath: string): Promise<any> {
   return new Promise((resolve, reject) => {
+    console.log(`Running Julia script: ${scriptPath}`);
     const juliaProcess = spawn('julia', [scriptPath]);
     
     let stdout = '';
@@ -135,32 +136,45 @@ async function runJuliaScript(scriptPath: string): Promise<any> {
     });
     
     juliaProcess.on('close', (code) => {
+      console.log(`Julia script exited with code: ${code}`);
+      console.log(`stdout length: ${stdout.length}`);
+      console.log(`stderr length: ${stderr.length}`);
+      
       if (code === 0) {
         try {
-          // Extract JSON-like data from stdout
-          const lines = stdout.split('\n');
-          const jsonLines = lines.filter(line => 
-            line.trim().startsWith('{') || 
-            line.trim().startsWith('Dict') ||
-            line.includes('"results"') ||
-            line.includes('"distribution"')
-          );
+          // Look for JSON output between markers
+          const jsonStart = stdout.indexOf('OUTPUT_JSON_START');
+          const jsonEnd = stdout.indexOf('OUTPUT_JSON_END');
           
-          if (jsonLines.length > 0) {
-            // For now, return a structured mock response based on the script type
-            resolve({ success: true, script: path.basename(scriptPath) });
+          console.log(`JSON start index: ${jsonStart}`);
+          console.log(`JSON end index: ${jsonEnd}`);
+          
+          if (jsonStart !== -1 && jsonEnd !== -1) {
+            const jsonContent = stdout.substring(jsonStart + 'OUTPUT_JSON_START'.length, jsonEnd).trim();
+            console.log(`JSON content length: ${jsonContent.length}`);
+            console.log(`JSON content preview: ${jsonContent.substring(0, 200)}...`);
+            const parsedData = JSON.parse(jsonContent);
+            console.log('Successfully parsed Julia output');
+            resolve(parsedData);
           } else {
+            console.log('No JSON markers found in output');
+            console.log('stdout preview:', stdout.substring(0, 500));
+            // Fallback to structured mock response
             resolve({ success: true, script: path.basename(scriptPath) });
           }
         } catch (error) {
+          console.error('Error parsing Julia output:', error);
+          console.log('stdout that failed to parse:', stdout);
           resolve({ success: true, script: path.basename(scriptPath) });
         }
       } else {
+        console.error(`Julia script failed with code ${code}: ${stderr}`);
         reject(new Error(`Julia script failed with code ${code}: ${stderr}`));
       }
     });
     
     juliaProcess.on('error', (error) => {
+      console.error(`Failed to start Julia process: ${error.message}`);
       reject(new Error(`Failed to start Julia process: ${error.message}`));
     });
   });
@@ -169,96 +183,43 @@ async function runJuliaScript(scriptPath: string): Promise<any> {
 export async function GET(request: NextRequest) {
   try {
     const baseDir = process.cwd();
-    const juliaDir = path.join(baseDir, 'JuliaOS', 'julia');
+    const juliaDir = path.join(baseDir, '..', 'JuliaOS', 'julia');
     
     // Define script paths
-    const sentimentScript = path.join(juliaDir, 'demo_sentiment.jl');
+    const sentimentScript = path.join(juliaDir, 'test_sentiment_reddit_integration.jl');
     const trendScript = path.join(juliaDir, 'demo_trend.jl');
     const consensusScript = path.join(juliaDir, 'demo_consensus.jl');
     
     console.log('Running Julia analytics scripts...');
     
-    // Run all three scripts in parallel
-    const [sentimentResult, trendResult, consensusResult] = await Promise.all([
-      runJuliaScript(sentimentScript),
+    // Run sentiment analysis script
+    const sentimentResult = await runJuliaScript(sentimentScript);
+    console.log('Sentiment analysis completed');
+    console.log('Sentiment result:', JSON.stringify(sentimentResult, null, 2));
+    
+    // Run other scripts in parallel (keeping mock data for now)
+    const [trendResult, consensusResult] = await Promise.all([
       runJuliaScript(trendScript),
       runJuliaScript(consensusScript)
     ]);
     
-    // Create mock data based on the actual structure from the Julia files
+    // Use actual sentiment data from Julia script
     const analyticsData: AnalyticsData = {
-      sentiment: {
-        results: [
-          {
-            post_id: "1mbsu4d",
-            text: "Dating a married woman",
-            full_text: "I've been dating a married woman for the past few months. She says she's in an open marriage but I'm starting to have doubts. What should I do?",
-            sentiment: "negative",
-            confidence: 0.85,
-            subreddit: "nonmonogamy",
-            positive_score: 0,
-            negative_score: 2,
-            sentiment_words: {
-              positive: [],
-              negative: ["doubts"]
-            }
-          },
-          {
-            post_id: "1mbsu4c",
-            text: "how do i help?",
-            full_text: "My friend is struggling with an eating disorder. I want to help but I don't know how. Any advice?",
-            sentiment: "negative",
-            confidence: 0.78,
-            subreddit: "EatingDisorders",
-            positive_score: 1,
-            negative_score: 2,
-            sentiment_words: {
-              positive: ["help"],
-              negative: ["struggling", "disorder"]
-            }
-          },
-          {
-            post_id: "1mbsu4b",
-            text: "Where do these hoses connect to?",
-            full_text: "I'm working on my Miata and found these loose hoses. Can anyone help me identify where they should connect?",
-            sentiment: "positive",
-            confidence: 0.92,
-            subreddit: "Miata",
-            positive_score: 1,
-            negative_score: 0,
-            sentiment_words: {
-              positive: ["help"],
-              negative: []
-            }
-          }
-        ],
-        distribution: {
-          positive: 1,
-          negative: 2,
-          neutral: 2
-        },
-        total_analyzed: 5,
-        average_confidence: 0.83,
+      sentiment: sentimentResult.sentiment || {
+        results: [],
+        distribution: { positive: 0, negative: 0, neutral: 0 },
+        total_analyzed: 0,
+        average_confidence: 0,
         sentiment_breakdown: {
-          positive_posts: 1,
-          negative_posts: 2,
-          neutral_posts: 2,
-          positive_percentage: 20.0,
-          negative_percentage: 40.0,
-          neutral_percentage: 40.0
+          positive_posts: 0,
+          negative_posts: 0,
+          neutral_posts: 0,
+          positive_percentage: 0,
+          negative_percentage: 0,
+          neutral_percentage: 0
         },
-        subreddit_sentiment: {
-          "nonmonogamy": { positive: 0, negative: 1, neutral: 0 },
-          "EatingDisorders": { positive: 0, negative: 1, neutral: 0 },
-          "Miata": { positive: 1, negative: 0, neutral: 0 },
-          "ChuckleSandwich": { positive: 0, negative: 0, neutral: 1 },
-          "balatro": { positive: 0, negative: 1, neutral: 0 }
-        },
-        confidence_distribution: {
-          high: 2,
-          medium: 2,
-          low: 1
-        }
+        subreddit_sentiment: {},
+        confidence_distribution: { high: 0, medium: 0, low: 0 }
       },
       trend: {
         period_start: new Date(Date.now() - 30 * 60 * 1000).toISOString(),

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 // Julia backend API base URL
-const JULIA_API_BASE = process.env.JULIA_API_BASE || 'http://localhost:8053/api/v1';
+const JULIA_API_BASE = process.env.JULIA_API_BASE || 'http://localhost:8055/api/v1';
 
 // Agent type mapping for Julia backend
 const AGENT_TYPE_MAP = {

@@ -1,46 +1,33 @@
 #!/usr/bin/env julia
 
-# Working Analytics API Server
-using HTTP, JSON3, Dates, Random, Statistics
+# Minimal Working Analytics API Server
+using HTTP, JSON3, Dates
 
-println("🚀 Starting Working Analytics API Server")
+println("🚀 Starting Minimal Analytics API Server")
 println(repeat("=", 50))
 
-# Global function definition
+# Simple get_analytics function
 function get_analytics(campaign_id::String="default")
     println("📊 Getting analytics for campaign: $campaign_id")
     
-    # Sample data
-    reddit_posts = [
-        Dict("id" => "1", "title" => "Help needed", "score" => 10, "subreddit" => "help"),
-        Dict("id" => "2", "title" => "Warning about bug", "score" => 5, "subreddit" => "bugs"),
-        Dict("id" => "3", "title" => "Great news", "score" => 15, "subreddit" => "news")
-    ]
-    
-    # Simple sentiment analysis
-    sentiment_results = []
-    for post in reddit_posts
-        sentiment = if contains(lowercase(post["title"]), "help") || contains(lowercase(post["title"]), "great")
-            "positive"
-        elseif contains(lowercase(post["title"]), "warning") || contains(lowercase(post["title"]), "bug")
-            "negative"
-        else
-            "neutral"
-        end
-        
-        push!(sentiment_results, Dict(
-            "post_id" => post["id"],
-            "text" => post["title"],
-            "sentiment" => sentiment,
-            "confidence" => 0.8 + rand() * 0.2,
-            "subreddit" => post["subreddit"]
-        ))
-    end
-    
     return Dict(
         "campaign" => Dict("id" => campaign_id, "name" => "Test Campaign"),
-        "reddit" => Dict("posts" => reddit_posts, "total_posts" => length(reddit_posts)),
-        "sentiment" => Dict("results" => sentiment_results, "total_analyzed" => length(sentiment_results)),
+        "reddit" => Dict(
+            "posts" => [
+                Dict("id" => "1", "title" => "Help needed", "score" => 10, "subreddit" => "help"),
+                Dict("id" => "2", "title" => "Warning about bug", "score" => 5, "subreddit" => "bugs"),
+                Dict("id" => "3", "title" => "Great news", "score" => 15, "subreddit" => "news")
+            ],
+            "total_posts" => 3
+        ),
+        "sentiment" => Dict(
+            "results" => [
+                Dict("post_id" => "1", "text" => "Help needed", "sentiment" => "positive", "confidence" => 0.85, "subreddit" => "help"),
+                Dict("post_id" => "2", "text" => "Warning about bug", "sentiment" => "negative", "confidence" => 0.78, "subreddit" => "bugs"),
+                Dict("post_id" => "3", "text" => "Great news", "sentiment" => "positive", "confidence" => 0.92, "subreddit" => "news")
+            ],
+            "total_analyzed" => 3
+        ),
         "metadata" => Dict("generated_at" => string(now()))
     )
 end
@@ -126,7 +113,7 @@ end
 
 # Main server function
 function start_server(port=8055)
-    println("🌐 Starting Working Analytics API Server on port $port")
+    println("🌐 Starting Minimal Analytics API Server on port $port")
     println("📡 Available endpoints:")
     println("  GET /api/v1/health")
     println("  GET /api/v1/analytics/{campaign_id}")
@@ -148,7 +135,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     start_server()
 end
 
-println("✅ Working Analytics API Server ready!")
+println("✅ Minimal Analytics API Server ready!")
 println("🔗 Access your analytics at:")
 println("  http://localhost:8055/api/v1/analytics/default")
 println("  http://localhost:8055/api/v1/analytics/sentiment/default")
