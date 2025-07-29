@@ -144,14 +144,25 @@ export default function AnalyticsPage() {
       setLoading(true);
       setError(null);
 
+      console.log('🔍 Fetching analytics for campaign:', campaignId);
+      
       const response = await fetch(`/api/analytics/campaign/${campaignId}`);
       if (!response.ok) {
         throw new Error("Failed to fetch analytics");
       }
 
       const data = await response.json();
+      console.log('📊 Analytics data received:', data);
+      console.log('📈 Campaign details:', data.campaign);
+      console.log('🕷️ Crawler data:', data.crawler);
+      console.log('📊 Analysis data:', data.analysis);
+      console.log('🤝 Consensus data:', data.consensus);
+      console.log('⚡ Performance data:', data.performance);
+      console.log('📅 Timeline data:', data.timeline);
+      
       setAnalyticsData(data);
     } catch (err: any) {
+      console.error('❌ Error fetching analytics:', err);
       setError(err.message);
       toast({
         title: "Error",

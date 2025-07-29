@@ -191,7 +191,8 @@ if !isdefined(Main, :get_analytics)
         )
     end
 
-    # Main GET function for analytics
+    # Main GET function for analytics - Define it in global scope
+    global get_analytics
     function get_analytics(campaign_id::String="default")
         println("🔍 Getting analytics for campaign: $campaign_id")
         

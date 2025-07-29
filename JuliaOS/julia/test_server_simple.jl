@@ -1,57 +1,55 @@
 #!/usr/bin/env julia
 
-# Simple server test
-using HTTP, JSON3, Dates
+# Simple test script to verify Julia server functionality
+using HTTP, JSON3
 
-println("🧪 Testing Simple Server")
-println(repeat("=", 40))
+println("🧪 Testing Julia Analytics Server...")
 
-# Simple test function
-function test_get_analytics(campaign_id::String="default")
-    return Dict(
-        "test" => "success",
-        "campaign_id" => campaign_id,
-        "timestamp" => string(now())
-    )
+# Test the server endpoints
+base_url = "http://localhost:8053/api/v1"
+
+# Test health endpoint
+println("\n📡 Testing health endpoint...")
+try
+    response = HTTP.get("$base_url/health")
+    println("✅ Health check passed: $(response.status)")
+    println("📊 Response: $(String(response.body))")
+catch e
+    println("❌ Health check failed: $e")
 end
 
-# Simple handler
-function handle_simple_analytics(req)
-    try
-        path_parts = split(HTTP.URI(req.target).path, "/")
-        campaign_id = length(path_parts) > 4 ? path_parts[5] : "default"
-        
-        println("📊 Simple analytics request for campaign: $campaign_id")
-        
-        result = test_get_analytics(campaign_id)
-        return HTTP.Response(200, JSON3.write(result))
-    catch e
-        println("❌ Error in simple handler: $e")
-        return HTTP.Response(500, JSON3.write(Dict("error" => "Simple handler error: $e")))
-    end
+# Test analytics endpoint
+println("\n📡 Testing analytics endpoint...")
+try
+    response = HTTP.get("$base_url/analytics/default")
+    println("✅ Analytics check passed: $(response.status)")
+    data = JSON3.read(String(response.body))
+    println("📊 Campaign ID: $(get(data, "campaign", Dict())["id"])")
+    println("📊 Total posts: $(get(get(data, "reddit", Dict()), "overview", Dict())["total_posts"])")
+catch e
+    println("❌ Analytics check failed: $e")
 end
 
-# Simple server
-function start_simple_server(port=8054)
-    println("🌐 Starting Simple Test Server on port $port")
-    
-    HTTP.serve(port) do req
-        if req.method == "OPTIONS"
-            return HTTP.Response(200, "", ["Access-Control-Allow-Origin" => "*"])
-        else
-            response = handle_simple_analytics(req)
-            response.headers = [
-                "Access-Control-Allow-Origin" => "*",
-                "Content-Type" => "application/json"
-            ]
-            return response
-        end
-    end
+# Test reddit endpoint
+println("\n📡 Testing reddit endpoint...")
+try
+    response = HTTP.get("$base_url/analytics/reddit/default")
+    println("✅ Reddit check passed: $(response.status)")
+    data = JSON3.read(String(response.body))
+    println("📊 Reddit data received")
+catch e
+    println("❌ Reddit check failed: $e")
 end
 
-# Start server
-if abspath(PROGRAM_FILE) == @__FILE__
-    start_simple_server()
+# Test sentiment endpoint
+println("\n📡 Testing sentiment endpoint...")
+try
+    response = HTTP.get("$base_url/analytics/sentiment/default")
+    println("✅ Sentiment check passed: $(response.status)")
+    data = JSON3.read(String(response.body))
+    println("📊 Sentiment data received")
+catch e
+    println("❌ Sentiment check failed: $e")
 end
 
-println("✅ Simple test server ready!") 
+println("\n🎉 Test completed!") 
