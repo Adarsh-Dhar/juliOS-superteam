@@ -56,6 +56,7 @@ import {
   Download,
   RefreshCw
 } from "lucide-react";
+import RedditPosts from "@/components/RedditPosts";
 
 interface AnalyticsData {
   campaign: {
@@ -277,6 +278,7 @@ export default function AnalyticsPage() {
           <div className="flex space-x-1 border-b border-gray-700">
             {[
               { id: "overview", label: "Overview", icon: BarChart3 },
+              { id: "reddit", label: "Reddit Posts", icon: MessageSquare },
               { id: "crawler", label: "Crawler", icon: Globe },
               { id: "analysis", label: "Analysis", icon: TrendingUp },
               { id: "consensus", label: "Consensus", icon: Cpu },
@@ -299,6 +301,18 @@ export default function AnalyticsPage() {
             ))}
           </div>
         </motion.div>
+
+        {/* Reddit Posts Tab */}
+        {activeTab === "reddit" && (
+          <motion.div 
+            className="space-y-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            <RedditPosts campaignId={campaignId!} />
+          </motion.div>
+        )}
 
         {/* Overview Tab */}
         {activeTab === "overview" && (
